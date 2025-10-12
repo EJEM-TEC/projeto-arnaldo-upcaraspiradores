@@ -1,4 +1,15 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# UpCarAspiradores - Mobile Application
+
+This is a [Next.js](https://nextjs.org) project for the UpCarAspiradores mobile application, featuring intelligent vacuum cleaner management.
+
+## Features
+
+- **Mobile-First Design**: Responsive design optimized for mobile devices
+- **Supabase Authentication**: Secure user authentication with Google OAuth and email/password
+- **Homepage**: Main interface for vacuum cleaner number input and balance management
+- **Lateral Menu**: Side navigation with user profile and menu options
+- **Role-Based Access**: Different access levels for admin and client users
+- **Protected Routes**: Middleware-based route protection
 
 ## Getting Started
 
@@ -16,7 +27,26 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Application Structure
+
+- `/login-usuario` - User login page
+- `/home` - Main homepage (protected, requires authentication)
+- `/painel_de_controle` - Admin dashboard (admin only)
+- `/signup-usuario` - User registration page
+
+## Authentication Flow
+
+1. Users access `/login-usuario` to authenticate
+2. After successful login, users are redirected to `/home`
+3. The homepage is protected by middleware and requires Supabase authentication
+4. Users can access the lateral menu for navigation and account management
+
+## Mobile Features
+
+- **Vacuum Cleaner Input**: Users can enter vacuum cleaner numbers
+- **Balance Display**: Shows current user balance
+- **Lateral Menu**: Contains user profile, navigation options, and logout
+- **Responsive Design**: Optimized for mobile devices with touch-friendly interface
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

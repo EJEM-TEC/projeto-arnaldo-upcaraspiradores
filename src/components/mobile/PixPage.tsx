@@ -1,0 +1,77 @@
+'use client';
+
+import { useState } from 'react';
+
+interface PixPageProps {
+    onNext: (data: { amount: string; cpf: string }) => void;
+}
+
+export default function PixPage({ onNext }: PixPageProps) {
+    const [selectedAmount, setSelectedAmount] = useState('5');
+    const [cpf, setCpf] = useState('');
+
+    const amounts = ['5', '10', '20', '30', '40', '50'];
+
+    const handleGenerateCode = () => {
+        if (cpf.trim()) {
+            onNext({ amount: selectedAmount, cpf });
+        }
+    };
+
+    return (
+        <div className="px-4 py-6">
+            {/* Page Title */}
+            <h1 className="text-white text-2xl font-bold text-center mb-8 uppercase">
+                PIX
+            </h1>
+
+            {/* Separator */}
+            <div className="w-full h-px bg-orange-500 mb-8"></div>
+
+            {/* Amount Selection */}
+            <div className="mb-8">
+                <p className="text-white text-lg mb-6 text-center">
+                    Quanto deseja adicionar?
+                </p>
+
+                <div className="grid grid-cols-3 gap-4 mb-8">
+                    {amounts.map((amount) => (
+                        <button
+                            key={amount}
+                            onClick={() => setSelectedAmount(amount)}
+                            className={`w-full h-16 rounded-full font-bold text-lg transition-colors ${selectedAmount === amount
+                                    ? 'bg-orange-500 text-white'
+                                    : 'bg-white text-black hover:bg-gray-200'
+                                }`}
+                        >
+                            R$ {amount}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Separator */}
+            <div className="w-full h-px bg-orange-500 mb-8"></div>
+
+            {/* CPF Input */}
+            <div className="mb-8">
+                <input
+                    type="text"
+                    value={cpf}
+                    onChange={(e) => setCpf(e.target.value)}
+                    placeholder="CPF do portador"
+                    className="w-full px-4 py-4 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg"
+                />
+            </div>
+
+            {/* Generate Code Button */}
+            <button
+                onClick={handleGenerateCode}
+                disabled={!cpf.trim()}
+                className="w-full bg-orange-500 text-white py-4 rounded-lg font-bold text-lg uppercase hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                GERAR CÓDIGO
+            </button>
+        </div>
+    );
+}

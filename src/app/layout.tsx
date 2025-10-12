@@ -16,11 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "UpCarApiradores",
   description: "Aspiradores Inteligentes",
-    icons: {
-      icon: '/favicon.ico',
-      shortcut: '/favicon.ico',
-      apple: '/favicon.ico',
-    }
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
+  }
 };
 
 export default function RootLayout({

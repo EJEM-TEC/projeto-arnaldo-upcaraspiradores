@@ -5,6 +5,7 @@ export interface usuarios {
   created_at: string;
   email: string;
   name: string;
+  role?: string; // Optional role field
 }
 
 // Create a new user profile in the database
@@ -60,8 +61,36 @@ export async function updateUserProfile(userId: string, updates: Partial<usuario
     .select()
     .single();
 
+  return { data, error: null };
+}
+
+// Set user role (admin or cliente)
+export async function setUserRole(userId: string, role: 'admin' | 'cliente') {
+  const { data, error } = await supabase
+    .from('usuarios')
+    .update({ role })
+    .eq('id', userId)
+    .select()
+    .single();
+
   if (error) {
-    console.error('Error updating user profile:', error);
+    console.error('Error setting user role:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
+// Get user role
+export async function getUserRole(userId: string) {
+  const { data, error } = await supabase
+    .from('usuarios')
+    .select('role')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching user role:', error);
     return { data: null, error };
   }
 

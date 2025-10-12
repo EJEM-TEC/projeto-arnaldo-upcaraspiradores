@@ -8,7 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null}>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -44,7 +44,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     return { error };
   };
-
 
   const signOut = async () => {
     await supabase.auth.signOut();

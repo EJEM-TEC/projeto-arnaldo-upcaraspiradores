@@ -38,7 +38,7 @@ export default function DashboardLayout({ children, subtitle }: DashboardLayoutP
         <div className="p-4">
           {/* Logo/Brand */}
           <div className="flex items-center mb-8">
-            <img src="../upcar_preto.png" alt="Logo" className="display: block; margin: 0 auto;" />
+            <img src="../upcar_preto.png" alt="Logo" className="display: block; margin: 0 auto; cursor-pointer" onClick={() => router.push('/')} />
           </div>
 
           {/* Toggle Button */}
