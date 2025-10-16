@@ -43,13 +43,21 @@ export default function MobileLoginPage() {
     };
 
     const handleGoogleLogin = async () => {
+        setLoading(true);
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
+            options: {
+                // Informa ao Supabase para onde redirecionar o usuário
+                // DEPOIS que ele fizer login no Google e voltar para o seu app.
+                redirectTo: `${window.location.origin}/auth/callback`,
+            },
         });
 
         if (error) {
-            setError('Erro ao fazer login com Google');
+            setError('Erro ao fazer login com Google: ' + error.message);
+            setLoading(false);
         }
+        // Não precisa de 'else', o redirecionamento para o Google vai acontecer automaticamente.
     };
 
     if (loading) {
