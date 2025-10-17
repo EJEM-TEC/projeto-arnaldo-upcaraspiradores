@@ -75,7 +75,7 @@ export default function SignUpPage() {
                 <Image src="/upcar_preto_menor.png" alt="UpCar Logo" width={200} height={100} className="mx-auto mb-1" />
                 <div className="text-center">
                     <div className="w-64 h-px bg-white mx-auto"></div>
-                    <p className="text-gray-400 text-sm italic text-xl">Aspiradores <span className="font-bold">inteligentes</span></p>
+                    <p className="text-gray-400 italic text-xl">Aspiradores <span className="font-bold">inteligentes</span></p>
                 </div>
             </div>
 
