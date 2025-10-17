@@ -13,7 +13,7 @@ export default function Page() {
       if (user) {
         router.push('/painel_de_controle?view=adicionar_credito');
       } else {
-        router.push('/login');
+        router.push('/login-usuario');
       }
     }
   }, [user, loading, router]);

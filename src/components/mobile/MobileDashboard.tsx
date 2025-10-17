@@ -22,7 +22,7 @@ import PrivacyPage from '@/components/mobile/PrivacyPage';
 type MobileView = 'home' | 'balance' | 'add-credit' | 'pix' | 'credit-card' | 'monthly' | 'pix-code' | 'timer' | 'history' | 'support' | 'terms' | 'privacy';
 
 export default function MobileDashboard() {
-    const [currentView, setCurrentView] = useState<MobileView>('home');
+    const [currentView, setCurrentView] = useState<MobileView>('add-credit');
     const [balance, setBalance] = useState('0,00');
     const [user, setUser] = useState<User | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
