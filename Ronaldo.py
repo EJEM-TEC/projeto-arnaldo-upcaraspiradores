@@ -23,8 +23,9 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 TABLE_NAME = "machines" # Nome da tabela que criamos
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-#264e387e6db345b988f186fa75eafdb5.s1.eu.hivemq.cloud URL 264e387e6db345b988f186fa75eafdb5.s1.eu.hivemq.cloud:8883 mqqt
-[31/10, 10:01] Thomas Trainee: 264e387e6db345b988f186fa75eafdb5.s1.eu.hivemq.cloud:8884/mqtt websocket
+#264e387e6db345b988f186fa75eafdb5.s1.eu.hivemq.cloud URL 
+#264e387e6db345b988f186fa75eafdb5.s1.eu.hivemq.cloud:8883 mqqt
+#264e387e6db345b988f186fa75eafdb5.s1.eu.hivemq.cloud:8884/mqtt websocket
 Config Broker MQTT
 MQTT_HOST = os.getenv("MQTT_HOST_URL")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "8883"))
