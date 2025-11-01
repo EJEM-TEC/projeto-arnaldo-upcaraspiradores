@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CreditCardPageProps {
     onNext: (data: { amount: string; cardData: any }) => void;
@@ -14,19 +15,88 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
     const [month, setMonth] = useState('');
     const [year, setYear] = useState('');
     const [cpf, setCpf] = useState('');
-
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const { user } = useAuth();
     const amounts = ['5', '10', '20', '30', '40', '50'];
 
-    const handlePay = () => {
-        const cardData = {
-            cardNumber,
-            cvv,
-            cardholderName,
-            month,
-            year,
-            cpf
-        };
-        onNext({ amount: selectedAmount, cardData });
+    const handlePay = async () => {
+        if (!cardNumber || !cvv || !cardholderName || !month || !year || !cpf) {
+            setError('Por favor, preencha todos os campos');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+
+        try {
+            // Primeiro, cria o token do cartão
+            const tokenResponse = await fetch('/api/payment/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    cardNumber: cardNumber.replace(/\s/g, ''),
+                    cardholderName,
+                    cardExpirationMonth: month,
+                    cardExpirationYear: year,
+                    securityCode: cvv,
+                    identificationType: 'CPF',
+                    identificationNumber: cpf.replace(/\D/g, ''),
+                }),
+            });
+
+            const tokenData = await tokenResponse.json();
+
+            if (!tokenResponse.ok) {
+                throw new Error(tokenData.error || 'Erro ao criar token do cartão');
+            }
+
+            // Agora cria o pagamento
+            const paymentResponse = await fetch('/api/payment/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    amount: selectedAmount,
+                    paymentMethod: 'credit-card',
+                    userId: user?.id,
+                    cardToken: tokenData.token,
+                    payer: {
+                        email: user?.email || '',
+                        cpf: cpf.replace(/\D/g, ''),
+                    },
+                    description: `Adicionar crédito via Cartão - R$ ${selectedAmount}`,
+                }),
+            });
+
+            const paymentData = await paymentResponse.json();
+
+            if (!paymentResponse.ok) {
+                throw new Error(paymentData.error || 'Erro ao processar pagamento');
+            }
+
+            if (paymentData.status === 'approved') {
+                // Pagamento aprovado, pode prosseguir
+                const cardData = {
+                    cardNumber,
+                    cvv,
+                    cardholderName,
+                    month,
+                    year,
+                    cpf
+                };
+                onNext({ amount: selectedAmount, cardData });
+            } else {
+                throw new Error(`Pagamento ${paymentData.status}. Tente novamente.`);
+            }
+        } catch (err: any) {
+            setError(err.message || 'Erro ao processar pagamento');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -116,12 +186,19 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                 />
             </div>
 
+            {error && (
+                <div className="mb-4 p-4 bg-red-500 text-white rounded-lg text-sm">
+                    {error}
+                </div>
+            )}
+
             {/* Pay Button */}
             <button
                 onClick={handlePay}
-                className="w-full bg-orange-500 text-white py-4 rounded-lg font-bold text-lg uppercase hover:bg-orange-600 transition-colors mb-4"
+                disabled={loading}
+                className="w-full bg-orange-500 text-white py-4 rounded-lg font-bold text-lg uppercase hover:bg-orange-600 transition-colors mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                PAGAR
+                {loading ? 'PROCESSANDO...' : 'PAGAR'}
             </button>
 
             {/* Secure Purchase Badge */}

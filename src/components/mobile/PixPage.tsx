@@ -1,20 +1,63 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PixPageProps {
-    onNext: (data: { amount: string; cpf: string }) => void;
+    onNext: (data: { amount: string; cpf: string; pixCode?: string; qrCode?: string }) => void;
 }
 
 export default function PixPage({ onNext }: PixPageProps) {
     const [selectedAmount, setSelectedAmount] = useState('5');
     const [cpf, setCpf] = useState('');
-
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const { user } = useAuth();
     const amounts = ['5', '10', '20', '30', '40', '50'];
 
-    const handleGenerateCode = () => {
-        if (cpf.trim()) {
-            onNext({ amount: selectedAmount, cpf });
+    const handleGenerateCode = async () => {
+        if (!cpf.trim()) {
+            setError('Por favor, informe o CPF');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+
+        try {
+            const response = await fetch('/api/payment/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    amount: selectedAmount,
+                    paymentMethod: 'pix',
+                    userId: user?.id,
+                    payer: {
+                        email: user?.email || '',
+                        cpf: cpf.replace(/\D/g, ''),
+                    },
+                    description: `Adicionar crédito via PIX - R$ ${selectedAmount}`,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Erro ao criar pagamento');
+            }
+
+            onNext({
+                amount: selectedAmount,
+                cpf,
+                pixCode: data.pixQrCode,
+                qrCode: data.pixCode,
+            });
+        } catch (err: any) {
+            setError(err.message || 'Erro ao processar pagamento');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -64,13 +107,19 @@ export default function PixPage({ onNext }: PixPageProps) {
                 />
             </div>
 
+            {error && (
+                <div className="mb-4 p-4 bg-red-500 text-white rounded-lg text-sm">
+                    {error}
+                </div>
+            )}
+
             {/* Generate Code Button */}
             <button
                 onClick={handleGenerateCode}
-                disabled={!cpf.trim()}
+                disabled={!cpf.trim() || loading}
                 className="w-full bg-orange-500 text-white py-4 rounded-lg font-bold text-lg uppercase hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                GERAR CÓDIGO
+                {loading ? 'GERANDO CÓDIGO...' : 'GERAR CÓDIGO'}
             </button>
         </div>
     );

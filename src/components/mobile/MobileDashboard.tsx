@@ -57,7 +57,7 @@ export default function MobileDashboard() {
         }
     };
 
-    const handlePixNext = (data: { amount: string; cpf: string }) => {
+    const handlePixNext = (data: { amount: string; cpf: string; pixCode?: string; qrCode?: string }) => {
         setPaymentData(data);
         setCurrentView('pix-code');
     };
@@ -96,6 +96,8 @@ export default function MobileDashboard() {
                 return <PixCodePage
                     amount={paymentData?.amount || '0'}
                     cpf={paymentData?.cpf || ''}
+                    pixCode={paymentData?.pixCode}
+                    qrCode={paymentData?.qrCode}
                     onCopyCode={handlePixCopyCode}
                 />;
             case 'timer':
