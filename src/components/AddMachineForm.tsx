@@ -5,7 +5,11 @@ import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '../components/ui/input';
 
-export function AddMachineForm() {
+interface AddMachineFormProps {
+  onSuccess?: () => void;
+}
+
+export function AddMachineForm({ onSuccess }: AddMachineFormProps) {
     const [machineId, setMachineId] = useState('');
     const [location, setLocation] = useState('');
     const [loading, setLoading] = useState(false);
@@ -35,7 +39,12 @@ export function AddMachineForm() {
             setSuccess(`Máquina ${machineId} adicionada com sucesso!`);
             setMachineId('');
             setLocation('');
-            window.location.reload();
+            // Chama callback de sucesso se fornecido
+            if (onSuccess) {
+                onSuccess();
+            } else {
+                window.location.reload();
+            }
         }
         setLoading(false);
     }

@@ -1,21 +1,67 @@
 'use client'
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Dashboard from '@/components/Dashboard';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [checkingRole, setCheckingRole] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
+    const checkAuthAndRole = async () => {
+      if (loading) return;
+
+      if (!user) {
+        router.push('/login-usuario');
+        return;
+      }
+
+      // Verificar role do usuário
+      try {
+        // Buscar role da tabela usuarios
+        const { data: profile } = await supabase
+          .from('usuarios')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        let role = profile?.role;
+        
+        // Se não tem role na tabela, verifica se é admin pelo email
+        if (!role) {
+          role = user.email === 'teste@email.com.br' ? 'admin' : 'cliente';
+        }
+
+        setUserRole(role);
+
+        // Se o usuário não é admin, redireciona para home
+        if (role !== 'admin') {
+          //router.push('/home');
+          return;
+        }
+      } catch (error) {
+        console.error('Erro ao verificar role:', error);
+        // Em caso de erro, verifica pelo email como fallback
+        const role = user.email === 'teste@email.com.br' ? 'admin' : 'cliente';
+        setUserRole(role);
+        if (role !== 'admin') {
+          //router.push('/home');
+          return;
+        }
+      } finally {
+        setCheckingRole(false);
+      }
+    };
+
+    checkAuthAndRole();
   }, [user, loading, router]);
 
-  if (loading) {
+  if (loading || checkingRole) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -26,7 +72,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!user) {
+  if (!user || userRole !== 'admin') {
     return null; // Will redirect in useEffect
   }
 

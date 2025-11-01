@@ -25,7 +25,6 @@ export default function DashboardLayout({ children, subtitle }: DashboardLayoutP
     { name: 'Adicionar Crédito', icon: '💲', href: '/painel_de_controle' },
     { name: 'Faturamento', icon: '📄', href: '/painel_de_controle?view=faturamento' },
     { name: 'Histórico de Acionamentos', icon: '📋', href: '/painel_de_controle?view=historico_acionamentos' },
-    { name: 'Histórico de Caixa', icon: '💰', href: '/painel_de_controle?view=historico_caixa' },
     { name: 'Equipamentos', icon: '🔧', href: '/painel_de_controle?view=equipamentos' },
     { name: 'Adicionar Máquina', icon: '➕', href: '/painel_de_controle?view=adicionar_maquina' },
     { name: 'Alterar Senha', icon: '🔐', href: '/painel_de_controle?view=alterar_senha' },
