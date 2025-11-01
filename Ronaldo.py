@@ -18,7 +18,7 @@ from typing import Optional
 
 load_dotenv()
 
-Config Supabase
+# --- Config Supabase (Lido do .env) ---
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 DEVICE_ID = os.getenv("DEVICE_ID", "pi-default")
@@ -27,17 +27,17 @@ TABLE_NAME = "machines"
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise SystemExit("Defina SUPABASE_URL e SUPABASE_KEY no .env")
 
-# Config GPIO (Lido do .env)
+# --- Config GPIO (Lido do .env) ---
 RELAY_PIN = int(os.getenv("RELAY_PIN", "17"))
 RELAY_ACTIVE_HIGH = os.getenv("RELAY_ACTIVE_HIGH", "true").lower() in ("1", "true", "yes")
 
-# Config de Tempo 
+# --- Config de Tempo ---
 COMMAND_POLL_INTERVAL = 5.0 # Segundos (checa comandos a cada 5s)
 TELEMETRY_INTERVAL = 60.0  # Segundos (envia dados a cada 60s)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-#Inicialização 
+# --- Inicialização ---
 logging.info("Iniciando serviço de polling do Supabase...")
 # O python é tão buxa q tem q inicializar o supabase no código kkk
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -47,7 +47,7 @@ relay = OutputDevice(RELAY_PIN, active_high=RELAY_ACTIVE_HIGH, initial_value=Fal
 
 # Inicializa o sensor DHT (use_pulseio=False é importante no Pi 4/Zero 2)
 SENSOR_PIN_BCM = int(os.getenv("DHT_SENSOR_PIN", "4"))
-dht_sensor = adafruit_dht.DHT22(getattr(board, f"D{SENSOR_PIN_BCM}"), use_pulseio=False)
+dht_sensor = adafruit_dht.DHT11(getattr(board, f"D{SENSOR_PIN_BCM}"), use_pulseio=False)
 
 current_state = "off"
 
@@ -68,7 +68,7 @@ def get_telemetry_data() -> dict:
     try:
         # Tenta ler o sensor. Isso pode falhar (é normal com DHT)
         temp = dht_sensor.temperature
-        # Filtra leituras irreais se o sensor falhar(isso é caso ele esteja usando um DHT11 ao invés do 22)
+        # Filtra leituras irreais se o sensor falhar
         if temp is None or temp < -10 or temp > 80:
             temp = None # Define como Nulo se a leitura for ruim
             logging.warning("Falha ao ler temperatura (Leitura inválida)")
@@ -153,23 +153,23 @@ def main_loop():
         while True:
             current_time = time.time()
             
-            #Bloco de Checagem de Comandos (Polling)
+            # --- Bloco de Checagem de Comandos (Polling) ---
             if current_time - last_command_check > COMMAND_POLL_INTERVAL:
                 check_for_commands()
                 last_command_check = current_time
             
-            #Bloco de Envio de Telemetria (Report)
+            # --- Bloco de Envio de Telemetria (Report) ---
             if current_time - last_telemetry_report > TELEMETRY_INTERVAL:
                 report_telemetry_and_heartbeat()
                 last_telemetry_report = current_time
                 
-            # Dorme por 1 segundo para não fritar o processador se nn vai gerar prejuízo pra nois e pro ronaldo 
+            # Dorme por 1 segundo para não fritar o processador
             time.sleep(1) 
             
     except KeyboardInterrupt:
         logging.info("Interrupção detectada. Desligando...")
         set_relay(False)
-        # Tenta enviar um último status "offline" antes de morrer caso seja desligado "do nada"
+        # Tenta enviar um último status "offline" antes de morrer
         try:
             supabase.table(TABLE_NAME).upsert({
                 "id": DEVICE_ID,
