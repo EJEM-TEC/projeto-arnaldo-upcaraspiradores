@@ -14,6 +14,22 @@ export default function MobileLoginPage() {
 
     useEffect(() => {
         const checkSession = async () => {
+            // Verifica se há erro na URL (vindo do callback do OAuth)
+            const urlParams = new URLSearchParams(window.location.search);
+            const errorParam = urlParams.get('error');
+            
+            if (errorParam) {
+                if (errorParam === 'auth_failed') {
+                    setError('Erro ao autenticar. Tente novamente.');
+                } else if (errorParam === 'unexpected_error') {
+                    setError('Erro inesperado. Tente novamente.');
+                } else {
+                    setError('Erro ao fazer login com Google. Tente novamente.');
+                }
+                // Remove o erro da URL
+                window.history.replaceState({}, '', '/login-usuario');
+            }
+
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 router.push('/home');

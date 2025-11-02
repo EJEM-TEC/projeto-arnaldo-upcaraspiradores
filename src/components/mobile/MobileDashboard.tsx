@@ -32,15 +32,45 @@ export default function MobileDashboard() {
 
     useEffect(() => {
         const checkAuth = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
+            // Primeiro tenta obter a sessão
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionError) {
+                console.error('Error getting session:', sessionError);
                 router.push('/login-usuario');
                 return;
             }
-            setUser(user);
-            setLoading(false);
+
+            if (!session || !session.user) {
+                // Se não há sessão, tenta obter o usuário diretamente
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                
+                if (!user || userError) {
+                    router.push('/login-usuario');
+                    return;
+                }
+                
+                setUser(user);
+                setLoading(false);
+            } else {
+                setUser(session.user);
+                setLoading(false);
+            }
         };
+        
         checkAuth();
+
+        // Listener para mudanças de autenticação
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                setUser(session.user);
+                setLoading(false);
+            } else {
+                router.push('/login-usuario');
+            }
+        });
+
+        return () => subscription.unsubscribe();
     }, [router]);
 
     const handlePaymentSelect = (method: string) => {

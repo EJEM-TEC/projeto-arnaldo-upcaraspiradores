@@ -7,11 +7,80 @@ import type { NextRequest } from 'next/server';
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
+  const error = requestUrl.searchParams.get('error');
+
+  // Se houver um erro (ex: usuário cancelou o login)
+  if (error) {
+    return NextResponse.redirect(`${requestUrl.origin}/login-usuario?error=${error}`);
+  }
 
   // Se houver um código de autorização na URL, troque-o por uma sessão
   if (code) {
     const supabase = createRouteHandlerClient({ cookies });
-    await supabase.auth.exchangeCodeForSession(code);
+    
+    try {
+      // Troca o código por uma sessão
+      const { data: sessionData, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+
+      if (sessionError) {
+        console.error('Error exchanging code for session:', sessionError);
+        return NextResponse.redirect(`${requestUrl.origin}/login-usuario?error=auth_failed`);
+      }
+
+      // Obtém o usuário da sessão
+      const user = sessionData?.user;
+
+      if (user) {
+        // Verifica se o perfil do usuário já existe na tabela usuarios
+        const { data: existingProfile, error: profileError } = await supabase
+          .from('usuarios')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+
+        // Se o perfil não existe, cria um novo
+        // profileError.code === 'PGRST116' significa que não encontrou (normal para novos usuários)
+        if (profileError && profileError.code === 'PGRST116') {
+          // Extrai o nome do usuário do metadata do Google
+          const fullName = user.user_metadata?.full_name || 
+                          user.user_metadata?.name || 
+                          user.email?.split('@')[0] || 
+                          'Usuário';
+
+          // Cria o perfil do usuário
+          const { error: insertError } = await supabase
+            .from('usuarios')
+            .insert([
+              {
+                id: user.id,
+                email: user.email || '',
+                name: fullName,
+                created_at: user.created_at || new Date().toISOString(),
+                role: 'cliente', // Define como cliente por padrão
+              },
+            ]);
+
+          if (insertError) {
+            console.error('Error creating user profile:', insertError);
+            // Se o erro for de duplicação (perfil já existe), tudo bem
+            if (insertError.code !== '23505') {
+              // Erro diferente de duplicação - pode ser problema
+              console.warn('Non-duplicate error when creating profile:', insertError);
+            }
+          } else {
+            console.log('User profile created successfully for:', user.email);
+          }
+        } else if (profileError && profileError.code !== 'PGRST116') {
+          // Erro diferente de "não encontrado" - pode ser problema
+          console.error('Error checking user profile:', profileError);
+        } else if (existingProfile) {
+          console.log('User profile already exists for:', user.email);
+        }
+      }
+    } catch (error: any) {
+      console.error('Unexpected error in OAuth callback:', error);
+      return NextResponse.redirect(`${requestUrl.origin}/login-usuario?error=unexpected_error`);
+    }
   }
 
   // Redireciona o usuário para a página home (mobile dashboard) após o login
