@@ -144,14 +144,23 @@ export async function POST(request: NextRequest) {
     console.log('==========================');
 
     // Prepara o body final antes do try para que possa ser usado no catch
-    // TESTE: Vamos tentar enviar expiration_month como NÚMERO (conforme documentação)
-    // O Mercado Pago pode esperar número inteiro (1-12) em vez de string
-    const expirationMonthAsNumber = monthNum; // Já temos o número válido (1-12)
+    // IMPORTANTE: O Mercado Pago espera card_expiration_month como NÚMERO INTEIRO (1-12)
+    // NÃO como string! Vamos garantir que seja realmente um número
+    const expirationMonthAsInt: number = monthNum; // Número inteiro 1-12 (garantido)
+    
+    // Valida que realmente é um número
+    if (typeof expirationMonthAsInt !== 'number' || isNaN(expirationMonthAsInt)) {
+      console.error('ERROR: expirationMonthAsInt is not a number:', expirationMonthAsInt);
+      return NextResponse.json(
+        { error: 'Erro interno: mês de expiração inválido' },
+        { status: 500 }
+      );
+    }
     
     const finalBody: {
       card_number: string;
       cardholder_name: string;
-      card_expiration_month: string | number; // Tenta como número primeiro
+      card_expiration_month: number; // OBRIGATÓRIO: Número inteiro 1-12
       card_expiration_year: string;
       security_code: string;
       cardholder_identification?: {
@@ -161,8 +170,8 @@ export async function POST(request: NextRequest) {
     } = {
       card_number: tokenBody.card_number,
       cardholder_name: tokenBody.cardholder_name,
-      // TENTATIVA: Enviar como NÚMERO (conforme documentação do Mercado Pago)
-      card_expiration_month: expirationMonthAsNumber, // Número inteiro 1-12
+      // ENVIANDO COMO NÚMERO INTEIRO (não string!)
+      card_expiration_month: expirationMonthAsInt, // Número inteiro 1-12
       card_expiration_year: tokenBody.card_expiration_year,
       security_code: tokenBody.security_code,
     };
@@ -187,10 +196,14 @@ export async function POST(request: NextRequest) {
       
       console.log('Final body que será enviado:');
       console.log(JSON.stringify(finalBody, null, 2));
-      console.log('card_expiration_month no final:', finalBody.card_expiration_month);
+      console.log('=== VERIFICAÇÃO DE TIPOS ===');
+      console.log('card_expiration_month valor:', finalBody.card_expiration_month);
       console.log('card_expiration_month tipo:', typeof finalBody.card_expiration_month);
-      console.log('card_expiration_month valor numérico original:', monthNum);
-      console.log('card_expiration_month como string seria:', String(monthNum).padStart(2, '0'));
+      console.log('card_expiration_month é número?', typeof finalBody.card_expiration_month === 'number');
+      console.log('card_expiration_month é string?', typeof finalBody.card_expiration_month === 'string');
+      console.log('monthNum original:', monthNum, '(tipo:', typeof monthNum, ')');
+      console.log('expirationMonthAsInt:', expirationMonthAsInt, '(tipo:', typeof expirationMonthAsInt, ')');
+      console.log('============================');
       
       result = await cardToken.create({
         body: finalBody as Parameters<typeof cardToken.create>[0]['body'],
