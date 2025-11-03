@@ -3,8 +3,18 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
+interface CardData {
+  token?: string;
+  cardNumber?: string;
+  cvv?: string;
+  cardholderName: string;
+  month?: string;
+  year?: string;
+  cpf: string;
+}
+
 interface CreditCardPageProps {
-    onNext: (data: { amount: string; cardData: any }) => void;
+    onNext: (data: { amount: string; cardData: CardData }) => void;
 }
 
 export default function CreditCardPage({ onNext }: CreditCardPageProps) {
@@ -92,8 +102,9 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
             } else {
                 throw new Error(`Pagamento ${paymentData.status}. Tente novamente.`);
             }
-        } catch (err: any) {
-            setError(err.message || 'Erro ao processar pagamento');
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao processar pagamento';
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }

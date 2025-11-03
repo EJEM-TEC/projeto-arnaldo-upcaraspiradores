@@ -54,8 +54,9 @@ export default function PixPage({ onNext }: PixPageProps) {
                 pixCode: data.pixQrCode,
                 qrCode: data.pixCode,
             });
-        } catch (err: any) {
-            setError(err.message || 'Erro ao processar pagamento');
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao processar pagamento';
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }

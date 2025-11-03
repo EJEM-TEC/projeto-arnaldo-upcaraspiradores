@@ -1,4 +1,9 @@
 import { supabase } from './supabaseClient';
+import { PostgrestError } from '@supabase/supabase-js';
+
+interface SupabaseErrorWithHint extends PostgrestError {
+  hint?: string;
+}
 
 export interface usuarios {
   id: string;
@@ -315,7 +320,8 @@ export async function getAllTransactions() {
   if (transactionsError) {
     // Verifica se a tabela não existe (várias formas que o Supabase pode retornar)
     const errorMessage = transactionsError.message || JSON.stringify(transactionsError);
-    const errorCode = transactionsError.code || (transactionsError as any).hint;
+    const errorWithHint = transactionsError as SupabaseErrorWithHint;
+    const errorCode = transactionsError.code || errorWithHint.hint;
     
     if (errorCode === '42P01' || 
         errorMessage?.toLowerCase().includes('does not exist') ||
@@ -387,7 +393,8 @@ export async function getTransactionsSummary(startDate?: string, endDate?: strin
   if (error) {
     // Verifica se a tabela não existe (várias formas que o Supabase pode retornar)
     const errorMessage = error.message || JSON.stringify(error);
-    const errorCode = error.code || (error as any).hint;
+    const errorWithHint = error as SupabaseErrorWithHint;
+    const errorCode = error.code || errorWithHint.hint;
     
     if (errorCode === '42P01' || 
         errorMessage?.toLowerCase().includes('does not exist') ||
@@ -440,11 +447,13 @@ export async function getTransactionsByUser(userId: string) {
 
 // Billing/Faturamento functions
 export interface BillingData {
-  period: string;
   totalRevenue: number;
   totalExpenses: number;
   netProfit: number;
   transactionCount: number;
+  transactions: Transaction[];
+  byPaymentMethod: Record<string, number>;
+  byUser: Array<{ user_id: string; amount: number; name?: string }>;
 }
 
 // Get billing data for a specific period

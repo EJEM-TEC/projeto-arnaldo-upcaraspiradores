@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createPaymentClient } from '@/lib/mercadopago';
 import { createTransaction } from '@/lib/database';
 
+interface PaymentData {
+  transaction_amount: number;
+  description: string;
+  payment_method_id?: string;
+  payer: {
+    email: string;
+    identification?: {
+      type: string;
+      number: string;
+    };
+  };
+  external_reference: string;
+  notification_url: string;
+  token?: string;
+  installments?: number;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -14,20 +31,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Busca o usuário autenticado
-    const authHeader = request.headers.get('authorization');
-    let user = null;
-    
-    if (authHeader) {
-      // Se tiver token, validar
-      // Por enquanto, vamos usar o userId do body
-    }
-
     // Monta os dados do pagamento baseado no método
-    const paymentData: any = {
+    const paymentData: PaymentData = {
       transaction_amount: parseFloat(amount),
       description: description || `Crédito adicionado - ${paymentMethod}`,
-      payment_method_id: paymentMethod === 'credit-card' ? 'visa' : null,
+      ...(paymentMethod === 'credit-card' && { payment_method_id: 'visa' }),
       payer: {
         email: payer?.email || 'payer@example.com',
         identification: payer?.cpf ? {
@@ -82,12 +90,13 @@ export async function POST(request: NextRequest) {
       { error: 'Failed to create payment' },
       { status: 500 }
     );
-  } catch (error: any) {
-    console.error('Error creating payment:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
-  }
+    } catch (error) {
+      console.error('Error creating payment:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: 500 }
+      );
+    }
 }
 

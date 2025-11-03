@@ -34,10 +34,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       token: result.id,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error creating card token:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create card token';
     return NextResponse.json(
-      { error: error.message || 'Failed to create card token' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

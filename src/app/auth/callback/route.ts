@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
           console.log('User profile already exists for:', user.email);
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Unexpected error in OAuth callback:', error);
       return NextResponse.redirect(`${requestUrl.origin}/login-usuario?error=unexpected_error`);
     }

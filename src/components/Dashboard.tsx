@@ -6,7 +6,14 @@ import DashboardLayout from './DashboardLayout';
 import { obterClientePorId } from '@/lib/clientes';
 import MudarSenhaForm from './mudar-senha';
 import { AddMachineForm } from './AddMachineForm';
-import { getAllMachines, Machine, getAllActivationHistory, ActivationHistory, createTransaction, getBillingData, Transaction } from '@/lib/database';
+import { getAllMachines, Machine, getAllActivationHistory, ActivationHistory, createTransaction, getBillingData, Transaction, BillingData } from '@/lib/database';
+
+interface ActivationHistoryWithMachine extends ActivationHistory {
+  machines?: {
+    id: number;
+    location?: string;
+  } | null;
+}
 
 type DashboardView = 'adicionar_credito' | 'faturamento' | 'historico_acionamentos' | 'equipamentos' | 'alterar_senha' | 'adicionar_maquina';
 
@@ -22,7 +29,7 @@ export default function Dashboard() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
-  const [billingData, setBillingData] = useState<any>(null);
+  const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [loadingBilling, setLoadingBilling] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<'today' | 'week' | 'month' | 'year'>('month');
 
@@ -198,9 +205,10 @@ export default function Dashboard() {
               // Recarregar histórico de caixa se estiver visível
               // Isso será feito automaticamente pelo useEffect quando currentView mudar
             }
-          } catch (error: any) {
+          } catch (error) {
             console.error('Erro ao adicionar crédito:', error);
-            alert(`Erro ao adicionar crédito: ${error.message || 'Erro desconhecido'}`);
+            const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+            alert(`Erro ao adicionar crédito: ${errorMessage}`);
           }
         };
 
@@ -301,7 +309,7 @@ export default function Dashboard() {
               <h2 className="text-3xl font-bold text-gray-900">Faturamento</h2>
               <select
                 value={billingPeriod}
-                onChange={(e) => setBillingPeriod(e.target.value as any)}
+                onChange={(e) => setBillingPeriod(e.target.value as 'today' | 'week' | 'month' | 'year')}
                 className="px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 text-gray-900"
               >
                 <option value="today">Hoje</option>
@@ -356,7 +364,7 @@ export default function Dashboard() {
                       <p className="text-gray-500">Nenhum dado disponível</p>
                     ) : (
                       <div className="space-y-3">
-                        {Object.entries(billingData.byPaymentMethod).map(([method, amount]: [string, any]) => {
+                        {Object.entries(billingData.byPaymentMethod).map(([method, amount]) => {
                           const methodLabels: Record<string, string> = {
                             'credit-card': 'Cartão de Crédito',
                             'debit-card': 'Cartão de Débito',
@@ -383,7 +391,7 @@ export default function Dashboard() {
                       <p className="text-gray-500">Nenhum dado disponível</p>
                     ) : (
                       <div className="space-y-3">
-                        {billingData.byUser.map((item: any, index: number) => (
+                        {billingData.byUser.map((item, index: number) => (
                           <div key={item.user_id} className="flex justify-between items-center">
                             <div className="flex items-center">
                               <span className="text-gray-400 mr-2">#{index + 1}</span>
@@ -499,8 +507,9 @@ export default function Dashboard() {
                           'bg-yellow-100 text-yellow-800';
 
                         // Nome do equipamento
-                        const machineName = (activation as any).machines?.location
-                          ? `Aspirador #${activation.machine_id} - ${(activation as any).machines.location}`
+                        const activationWithMachine = activation as ActivationHistoryWithMachine;
+                        const machineName = activationWithMachine.machines?.location
+                          ? `Aspirador #${activation.machine_id} - ${activationWithMachine.machines.location}`
                           : `Aspirador #${activation.machine_id}`;
 
                         // Comando
