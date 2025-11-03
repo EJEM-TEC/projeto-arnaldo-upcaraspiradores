@@ -61,7 +61,7 @@ export async function getUserProfile(userId: string) {
 
 // Update user profile
 export async function updateUserProfile(userId: string, updates: Partial<usuarios>) {
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('usuarios')
     .update(updates)
     .eq('id', userId)

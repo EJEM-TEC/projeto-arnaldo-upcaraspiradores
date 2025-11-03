@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface PixCodePageProps {
     amount: string;
@@ -10,7 +10,7 @@ interface PixCodePageProps {
     onCopyCode: () => void;
 }
 
-export default function PixCodePage({ amount, cpf, pixCode, qrCode, onCopyCode }: PixCodePageProps) {
+export default function PixCodePage({ amount, pixCode, qrCode, onCopyCode }: PixCodePageProps) {
     const [copied, setCopied] = useState(false);
 
     const handleCopy = async () => {

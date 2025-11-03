@@ -44,7 +44,7 @@ export default function SignUpPage() {
                 alert('Cadastro realizado com sucesso! Faça o login para continuar.');
                 router.push('/login-usuario');
             }
-        } catch (err) {
+        } catch {
             setError('Erro ao criar conta. Tente novamente.');
         } finally {
             setLoading(false);

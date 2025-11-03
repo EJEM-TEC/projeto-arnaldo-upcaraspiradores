@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { type CardData } from './CreditCardPage';
 
 interface MonthlyPageProps {
-    onNext: (data: { amount: string; cardData: Record<string, string> }) => void;
+    onNext: (data: { amount: string; cardData: CardData }) => void;
 }
 
 export default function MonthlyPage({ onNext }: MonthlyPageProps) {

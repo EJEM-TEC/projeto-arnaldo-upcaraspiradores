@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface TimerPageProps {
     amount: string;
@@ -10,7 +10,6 @@ interface TimerPageProps {
 export default function TimerPage({ amount, onStart }: TimerPageProps) {
     const [selectedTime, setSelectedTime] = useState('');
     const [remainingTime, setRemainingTime] = useState('00:00');
-    const [isRunning, setIsRunning] = useState(false);
 
     const timeOptions = [
         { label: '5 min', value: '5', price: 5 },
@@ -28,7 +27,6 @@ export default function TimerPage({ amount, onStart }: TimerPageProps) {
 
     const handleStart = () => {
         if (selectedTime) {
-            setIsRunning(true);
             onStart();
         }
     };

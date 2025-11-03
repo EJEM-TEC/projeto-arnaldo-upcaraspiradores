@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     // Se o pagamento foi criado com sucesso, cria a transação no banco
     if (result.id) {
-      const transactionResult = await createTransaction({
+      await createTransaction({
         user_id: userId || null,
         amount: parseFloat(amount),
         type: 'entrada',

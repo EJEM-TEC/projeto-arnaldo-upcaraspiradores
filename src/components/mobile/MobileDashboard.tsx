@@ -9,7 +9,7 @@ import MobileNavbar from '@/components/mobile/MobileNavbar';
 import HomePage from '@/components/mobile/HomePage';
 import AddCreditPage from '@/components/mobile/AddCreditPage';
 import PixPage from '@/components/mobile/PixPage';
-import CreditCardPage from '@/components/mobile/CreditCardPage';
+import CreditCardPage, { type CardData } from '@/components/mobile/CreditCardPage';
 import MonthlyPage from '@/components/mobile/MonthlyPage';
 import PixCodePage from '@/components/mobile/PixCodePage';
 import TimerPage from '@/components/mobile/TimerPage';
@@ -23,11 +23,17 @@ type MobileView = 'home' | 'balance' | 'add-credit' | 'pix' | 'credit-card' | 'm
 
 export default function MobileDashboard() {
     const [currentView, setCurrentView] = useState<MobileView>('add-credit');
-    const [balance, setBalance] = useState('0,00');
+    const [balance] = useState('0,00');
     const [user, setUser] = useState<User | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [paymentData, setPaymentData] = useState<{ amount: string; cpf?: string; cardData?: Record<string, string> } | null>(null);
+    const [paymentData, setPaymentData] = useState<{ 
+        amount: string; 
+        cpf?: string; 
+        cardData?: CardData;
+        pixCode?: string;
+        qrCode?: string;
+    } | null>(null);
     const router = useRouter();
 
     useEffect(() => {
@@ -92,7 +98,7 @@ export default function MobileDashboard() {
         setCurrentView('pix-code');
     };
 
-    const handlePaymentNext = (data: { amount: string; cardData: Record<string, string> }) => {
+    const handlePaymentNext = (data: { amount: string; cardData: CardData }) => {
         setPaymentData(data);
         setCurrentView('timer');
     };

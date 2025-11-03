@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
-interface CardData {
+export interface CardData {
   token?: string;
   cardNumber?: string;
   cvv?: string;
