@@ -1,5 +1,5 @@
 // src/app/auth/callback/route.ts
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
@@ -16,7 +16,29 @@ export async function GET(request: NextRequest) {
 
   // Se houver um código de autorização na URL, troque-o por uma sessão
   if (code) {
-    const supabase = createRouteHandlerClient({ cookies });
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) => {
+                cookieStore.set(name, value, options);
+              });
+            } catch {
+              // The `setAll` method was called from a Server Component.
+              // This can be ignored if you have middleware refreshing
+              // user sessions.
+            }
+          },
+        },
+      }
+    );
     
     try {
       // Troca o código por uma sessão
@@ -36,11 +58,11 @@ export async function GET(request: NextRequest) {
           .from('usuarios')
           .select('id')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         // Se o perfil não existe, cria um novo
-        // profileError.code === 'PGRST116' significa que não encontrou (normal para novos usuários)
-        if (profileError && profileError.code === 'PGRST116') {
+        // Se existingProfile for null, significa que não encontrou (normal para novos usuários)
+        if (!existingProfile && (!profileError || profileError.code === 'PGRST116')) {
           // Extrai o nome do usuário do metadata do Google
           const fullName = user.user_metadata?.full_name || 
                           user.user_metadata?.name || 
@@ -70,7 +92,7 @@ export async function GET(request: NextRequest) {
           } else {
             console.log('User profile created successfully for:', user.email);
           }
-        } else if (profileError && profileError.code !== 'PGRST116') {
+        } else if (profileError) {
           // Erro diferente de "não encontrado" - pode ser problema
           console.error('Error checking user profile:', profileError);
         } else if (existingProfile) {

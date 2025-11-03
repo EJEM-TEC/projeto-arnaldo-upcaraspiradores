@@ -72,7 +72,7 @@ export async function middleware(req: NextRequest) {
     .from('usuarios')
     .select('role')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   // arnaldfirst@gmail.com é sempre admin (prioridade sobre role na tabela)
   let userRole = user.email === 'arnaldfirst@gmail.com' ? 'admin' : profile?.role

@@ -49,7 +49,7 @@ export async function getUserProfile(userId: string) {
     .from('usuarios')
     .select('*')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error fetching user profile:', error);
