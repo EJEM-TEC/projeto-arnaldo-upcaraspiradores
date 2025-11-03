@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Valida e formata o mês de expiração
-    let expirationMonth: string;
     if (!cardExpirationMonth) {
       return NextResponse.json(
         { error: 'Mês de expiração é obrigatório' },
@@ -40,10 +39,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    expirationMonth = String(monthNum).padStart(2, '0');
+    const expirationMonth = String(monthNum).padStart(2, '0');
 
     // Valida e formata o ano de expiração
-    let expirationYear: string;
     if (!cardExpirationYear) {
       return NextResponse.json(
         { error: 'Ano de expiração é obrigatório' },
@@ -52,6 +50,7 @@ export async function POST(request: NextRequest) {
     }
     
     const yearStr = String(cardExpirationYear).replace(/\D/g, '');
+    let expirationYear: string;
     if (yearStr.length === 2) {
       expirationYear = `20${yearStr}`;
     } else if (yearStr.length === 4) {
