@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { type CardData } from './CreditCardPage';
 
 interface MonthlyPageProps {
@@ -15,19 +16,88 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
     const [month, setMonth] = useState('');
     const [year, setYear] = useState('');
     const [cpf, setCpf] = useState('');
-
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const { user } = useAuth();
     const amounts = ['5', '10', '20', '30', '40', '50'];
 
-    const handleAdd = () => {
-        const cardData = {
-            cardNumber,
-            cvv,
-            cardholderName,
-            month,
-            year,
-            cpf
-        };
-        onNext({ amount: selectedAmount, cardData });
+    const handleAdd = async () => {
+        if (!cardNumber || !cvv || !cardholderName || !month || !year || !cpf) {
+            setError('Por favor, preencha todos os campos');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+
+        try {
+            // Primeiro, cria o token do cartão
+            const tokenResponse = await fetch('/api/payment/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    cardNumber: cardNumber.replace(/\s/g, ''),
+                    cardholderName,
+                    cardExpirationMonth: month,
+                    cardExpirationYear: year,
+                    securityCode: cvv,
+                    identificationType: 'CPF',
+                    identificationNumber: cpf.replace(/\D/g, ''),
+                }),
+            });
+
+            const tokenData = await tokenResponse.json();
+
+            if (!tokenResponse.ok) {
+                throw new Error(tokenData.error || 'Erro ao criar token do cartão');
+            }
+
+            // Agora cria a assinatura recorrente
+            const subscriptionResponse = await fetch('/api/payment/subscription', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    amount: selectedAmount,
+                    userId: user?.id,
+                    cardToken: tokenData.token,
+                    payer: {
+                        email: user?.email || '',
+                        cpf: cpf.replace(/\D/g, ''),
+                    },
+                    description: `Assinatura mensal - R$ ${selectedAmount} (Dia 15)`,
+                }),
+            });
+
+            const subscriptionData = await subscriptionResponse.json();
+
+            if (!subscriptionResponse.ok) {
+                throw new Error(subscriptionData.error || 'Erro ao criar assinatura');
+            }
+
+            if (subscriptionData.success) {
+                // Assinatura criada com sucesso
+                const cardData = {
+                    cardNumber,
+                    cvv,
+                    cardholderName,
+                    month,
+                    year,
+                    cpf
+                };
+                onNext({ amount: selectedAmount, cardData });
+            } else {
+                throw new Error('Falha ao criar assinatura');
+            }
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao processar assinatura';
+            setError(errorMessage);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -117,12 +187,19 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
                 />
             </div>
 
+            {error && (
+                <div className="mb-4 p-4 bg-red-500 text-white rounded-lg text-sm">
+                    {error}
+                </div>
+            )}
+
             {/* Add Button */}
             <button
                 onClick={handleAdd}
-                className="w-full bg-orange-500 text-white py-4 rounded-lg font-bold text-lg uppercase hover:bg-orange-600 transition-colors mb-4"
+                disabled={loading}
+                className="w-full bg-orange-500 text-white py-4 rounded-lg font-bold text-lg uppercase hover:bg-orange-600 transition-colors mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                ADICIONAR
+                {loading ? 'PROCESSANDO...' : 'ADICIONAR ASSINATURA'}
             </button>
 
             {/* Secure Purchase Badge */}

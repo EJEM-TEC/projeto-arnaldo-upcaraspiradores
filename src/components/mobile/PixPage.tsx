@@ -51,8 +51,8 @@ export default function PixPage({ onNext }: PixPageProps) {
             onNext({
                 amount: selectedAmount,
                 cpf,
-                pixCode: data.pixQrCode,
-                qrCode: data.pixCode,
+                pixCode: data.pixCode || data.pixQrCode,
+                qrCode: data.pixQrCode || data.pixCode,
             });
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Erro ao processar pagamento';
