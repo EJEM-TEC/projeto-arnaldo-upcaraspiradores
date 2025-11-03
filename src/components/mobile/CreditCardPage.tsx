@@ -74,6 +74,7 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                     paymentMethod: 'credit-card',
                     userId: user?.id,
                     cardToken: tokenData.token,
+                    cardNumber: cardNumber.replace(/\s/g, ''), // Envia o número para detectar a bandeira
                     payer: {
                         email: user?.email || '',
                         cpf: cpf.replace(/\D/g, ''),

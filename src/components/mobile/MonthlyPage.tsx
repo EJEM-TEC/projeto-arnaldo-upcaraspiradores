@@ -64,6 +64,7 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
                     amount: selectedAmount,
                     userId: user?.id,
                     cardToken: tokenData.token,
+                    cardNumber: cardNumber.replace(/\s/g, ''), // Envia o número para detectar a bandeira
                     payer: {
                         email: user?.email || '',
                         cpf: cpf.replace(/\D/g, ''),

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createCardTokenClient } from '@/lib/mercadopago';
+import { detectCardBrand, validateCardNumber } from '@/lib/cardUtils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,13 +14,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Valida o número do cartão
+    const cleanedCardNumber = cardNumber.replace(/\s/g, '');
+    if (!validateCardNumber(cleanedCardNumber)) {
+      return NextResponse.json(
+        { error: 'Invalid card number' },
+        { status: 400 }
+      );
+    }
+
+    // Detecta a bandeira do cartão
+    const cardBrand = detectCardBrand(cleanedCardNumber);
+
     // Cria o token do cartão no Mercado Pago
     const cardToken = createCardTokenClient();
     const tokenBody: Record<string, unknown> = {
-      card_number: cardNumber.replace(/\s/g, ''),
+      card_number: cleanedCardNumber,
       cardholder_name: cardholderName,
-      card_expiration_month: cardExpirationMonth,
-      card_expiration_year: cardExpirationYear,
+      card_expiration_month: String(cardExpirationMonth).padStart(2, '0'),
+      card_expiration_year: String(cardExpirationYear).length === 2 
+        ? `20${cardExpirationYear}` 
+        : cardExpirationYear,
       security_code: securityCode,
     };
 
@@ -37,6 +52,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       token: result.id,
+      cardBrand: cardBrand, // Retorna a bandeira detectada
     });
   } catch (error) {
     console.error('Error creating card token:', error);

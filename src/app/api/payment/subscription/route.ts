@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMercadoPagoClient } from '@/lib/mercadopago';
 import { createTransaction } from '@/lib/database';
+import { detectCardBrand } from '@/lib/cardUtils';
 
 // Para assinaturas recorrentes, usaremos Preapproval do Mercado Pago
 // que permite cobranças automáticas mensais
@@ -8,7 +9,7 @@ import { createTransaction } from '@/lib/database';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { amount, userId, payer, cardToken, description } = body;
+    const { amount, userId, payer, cardToken, cardNumber, description } = body;
 
     if (!amount || !cardToken || !payer) {
       return NextResponse.json(
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-      'https://projeto-arnaldo-upcaraspiradores.vercel.app/home';
+      'https://projeto-arnaldo-upcaraspiradores.vercel.app';
 
     // Cria um Preapproval (Assinatura Recorrente) no Mercado Pago
     // Isso permite cobranças automáticas mensais

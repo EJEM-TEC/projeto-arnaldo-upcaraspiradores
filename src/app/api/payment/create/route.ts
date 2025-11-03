@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPaymentClient } from '@/lib/mercadopago';
 import { createTransaction } from '@/lib/database';
+import { detectCardBrand } from '@/lib/cardUtils';
 
 interface PaymentData {
   transaction_amount: number;
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-      'https://projeto-arnaldo-upcaraspiradores.vercel.app/home';
+      'https://projeto-arnaldo-upcaraspiradores.vercel.app';
 
     // Monta os dados do pagamento baseado no método
     const paymentData: PaymentData = {
@@ -75,7 +76,14 @@ export async function POST(request: NextRequest) {
       }
       paymentData.token = cardToken;
       paymentData.installments = 1;
-      paymentData.payment_method_id = 'visa'; // Será determinado automaticamente pelo token
+      
+      // Detecta a bandeira do cartão se o número foi fornecido
+      // Caso contrário, deixa o MercadoPago determinar automaticamente
+      if (body.cardNumber) {
+        const cardBrand = detectCardBrand(body.cardNumber);
+        paymentData.payment_method_id = cardBrand;
+      }
+      // Se não tiver o número, o MercadoPago determinará a bandeira pelo token
     }
 
     // Cria o pagamento no Mercado Pago
