@@ -36,6 +36,20 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
             return;
         }
 
+        // Valida e limpa o mês
+        const cleanedMonth = month.replace(/\D/g, '').trim();
+        if (!cleanedMonth || cleanedMonth === '' || parseInt(cleanedMonth, 10) < 1 || parseInt(cleanedMonth, 10) > 12) {
+            setError('Mês de expiração inválido (digite um número entre 1 e 12)');
+            return;
+        }
+
+        // Valida e limpa o ano
+        const cleanedYear = year.replace(/\D/g, '').trim();
+        if (!cleanedYear || cleanedYear === '') {
+            setError('Ano de expiração inválido');
+            return;
+        }
+
         setLoading(true);
         setError('');
 
@@ -49,8 +63,8 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                 body: JSON.stringify({
                     cardNumber: cardNumber.replace(/\s/g, ''),
                     cardholderName,
-                    cardExpirationMonth: month,
-                    cardExpirationYear: year,
+                    cardExpirationMonth: cleanedMonth,
+                    cardExpirationYear: cleanedYear,
                     securityCode: cvv,
                     identificationType: 'CPF',
                     identificationNumber: cpf.replace(/\D/g, ''),
@@ -181,15 +195,33 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                     <input
                         type="text"
                         value={month}
-                        onChange={(e) => setMonth(e.target.value)}
-                        placeholder="MÊS"
+                        onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            if (value === '' || (parseInt(value, 10) >= 1 && parseInt(value, 10) <= 12)) {
+                                setMonth(value);
+                            }
+                        }}
+                        onBlur={(e) => {
+                            const value = e.target.value.replace(/\D/g, '').trim();
+                            if (value && parseInt(value, 10) >= 1 && parseInt(value, 10) <= 12) {
+                                setMonth(String(parseInt(value, 10)).padStart(2, '0'));
+                            }
+                        }}
+                        placeholder="MÊS (01-12)"
+                        maxLength={2}
                         className="w-full px-4 py-4 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg"
                     />
                     <input
                         type="text"
                         value={year}
-                        onChange={(e) => setYear(e.target.value)}
-                        placeholder="ANO"
+                        onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            if (value.length <= 4) {
+                                setYear(value);
+                            }
+                        }}
+                        placeholder="ANO (AAAA)"
+                        maxLength={4}
                         className="w-full px-4 py-4 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg"
                     />
                 </div>

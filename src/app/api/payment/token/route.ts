@@ -23,6 +23,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Valida e formata o mês de expiração
+    let expirationMonth: string;
+    if (!cardExpirationMonth) {
+      return NextResponse.json(
+        { error: 'Mês de expiração é obrigatório' },
+        { status: 400 }
+      );
+    }
+    
+    // Converte para número e valida
+    const monthNum = parseInt(String(cardExpirationMonth).replace(/\D/g, ''), 10);
+    if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+      return NextResponse.json(
+        { error: 'Mês de expiração inválido (deve ser entre 1 e 12)' },
+        { status: 400 }
+      );
+    }
+    expirationMonth = String(monthNum).padStart(2, '0');
+
+    // Valida e formata o ano de expiração
+    let expirationYear: string;
+    if (!cardExpirationYear) {
+      return NextResponse.json(
+        { error: 'Ano de expiração é obrigatório' },
+        { status: 400 }
+      );
+    }
+    
+    const yearStr = String(cardExpirationYear).replace(/\D/g, '');
+    if (yearStr.length === 2) {
+      expirationYear = `20${yearStr}`;
+    } else if (yearStr.length === 4) {
+      expirationYear = yearStr;
+    } else {
+      return NextResponse.json(
+        { error: 'Ano de expiração inválido' },
+        { status: 400 }
+      );
+    }
+
     // Detecta a bandeira do cartão
     const cardBrand = detectCardBrand(cleanedCardNumber);
 
@@ -31,10 +71,8 @@ export async function POST(request: NextRequest) {
     const tokenBody: Record<string, unknown> = {
       card_number: cleanedCardNumber,
       cardholder_name: cardholderName,
-      card_expiration_month: String(cardExpirationMonth).padStart(2, '0'),
-      card_expiration_year: String(cardExpirationYear).length === 2 
-        ? `20${cardExpirationYear}` 
-        : cardExpirationYear,
+      card_expiration_month: expirationMonth,
+      card_expiration_year: expirationYear,
       security_code: securityCode,
     };
 
@@ -49,9 +87,11 @@ export async function POST(request: NextRequest) {
     console.log('Creating card token with data:', {
       card_number: `${cleanedCardNumber.substring(0, 4)}****${cleanedCardNumber.substring(cleanedCardNumber.length - 4)}`,
       cardholder_name: cardholderName,
-      card_expiration_month: tokenBody.card_expiration_month,
-      card_expiration_year: tokenBody.card_expiration_year,
+      card_expiration_month: expirationMonth,
+      card_expiration_year: expirationYear,
       has_identification: !!tokenBody.cardholder_identification,
+      raw_month: cardExpirationMonth,
+      raw_year: cardExpirationYear,
     });
 
     let result;
