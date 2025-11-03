@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-      'http://localhost:3000';
+      'https://projeto-arnaldo-upcaraspiradores.vercel.app/home';
 
     // Cria um Preapproval (Assinatura Recorrente) no Mercado Pago
     // Isso permite cobranças automáticas mensais
