@@ -50,25 +50,38 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
             return;
         }
 
+        // Log para debug
+        console.log('Frontend - Sending token request:', {
+            month: cleanedMonth,
+            year: cleanedYear,
+            monthType: typeof cleanedMonth,
+            yearType: typeof cleanedYear,
+        });
+
         setLoading(true);
         setError('');
 
         try {
+            // Prepara o body da requisição
+            const tokenRequestBody = {
+                cardNumber: cardNumber.replace(/\s/g, ''),
+                cardholderName,
+                cardExpirationMonth: cleanedMonth,
+                cardExpirationYear: cleanedYear,
+                securityCode: cvv,
+                identificationType: 'CPF',
+                identificationNumber: cpf.replace(/\D/g, ''),
+            };
+
+            console.log('Frontend - Full token request body:', JSON.stringify(tokenRequestBody, null, 2));
+
             // Primeiro, cria o token do cartão
             const tokenResponse = await fetch('/api/payment/token', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    cardNumber: cardNumber.replace(/\s/g, ''),
-                    cardholderName,
-                    cardExpirationMonth: cleanedMonth,
-                    cardExpirationYear: cleanedYear,
-                    securityCode: cvv,
-                    identificationType: 'CPF',
-                    identificationNumber: cpf.replace(/\D/g, ''),
-                }),
+                body: JSON.stringify(tokenRequestBody),
             });
 
             const tokenData = await tokenResponse.json();

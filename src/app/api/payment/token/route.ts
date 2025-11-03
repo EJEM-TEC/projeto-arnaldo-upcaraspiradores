@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    // O Mercado Pago aceita tanto string quanto número, mas vamos enviar como string com 2 dígitos
+    // para garantir compatibilidade: "01" a "12"
     const expirationMonth = String(monthNum).padStart(2, '0');
 
     // Valida e formata o ano de expiração
@@ -67,13 +69,35 @@ export async function POST(request: NextRequest) {
 
     // Cria o token do cartão no Mercado Pago
     const cardToken = createCardTokenClient();
-    const tokenBody: Record<string, unknown> = {
+    
+    // Prepara o body com os tipos corretos
+    // IMPORTANTE: Verificar se o campo está realmente sendo preenchido
+    const tokenBody: {
+      card_number: string;
+      cardholder_name: string;
+      card_expiration_month: string;
+      card_expiration_year: string;
+      security_code: string;
+      cardholder_identification?: {
+        type: string;
+        number: string;
+      };
+    } = {
       card_number: cleanedCardNumber,
       cardholder_name: cardholderName,
-      card_expiration_month: expirationMonth,
-      card_expiration_year: expirationYear,
-      security_code: securityCode,
+      card_expiration_month: expirationMonth, // String com 2 dígitos (ex: "01", "12")
+      card_expiration_year: expirationYear, // String com 4 dígitos (ex: "2025")
+      security_code: String(securityCode),
     };
+    
+    // Validação de segurança: verifica se o mês não está vazio antes de enviar
+    if (!expirationMonth || expirationMonth.trim() === '' || expirationMonth === '00') {
+      console.error('ERROR: expirationMonth is empty or invalid:', expirationMonth);
+      return NextResponse.json(
+        { error: 'Mês de expiração inválido ou vazio' },
+        { status: 400 }
+      );
+    }
 
     // Adiciona dados de identificação se fornecidos
     if (identificationNumber) {
@@ -83,18 +107,26 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    console.log('Creating card token with data:', {
-      card_number: `${cleanedCardNumber.substring(0, 4)}****${cleanedCardNumber.substring(cleanedCardNumber.length - 4)}`,
-      cardholder_name: cardholderName,
-      card_expiration_month: expirationMonth,
-      card_expiration_year: expirationYear,
-      has_identification: !!tokenBody.cardholder_identification,
-      raw_month: cardExpirationMonth,
-      raw_year: cardExpirationYear,
-    });
+    // Log detalhado do que será enviado
+    console.log('=== CARD TOKEN REQUEST ===');
+    console.log('Raw input - month:', cardExpirationMonth, 'type:', typeof cardExpirationMonth);
+    console.log('Raw input - year:', cardExpirationYear, 'type:', typeof cardExpirationYear);
+    console.log('Processed - month:', expirationMonth, 'type:', typeof expirationMonth, 'length:', expirationMonth.length);
+    console.log('Processed - year:', expirationYear, 'type:', typeof expirationYear, 'length:', expirationYear.length);
+    console.log('tokenBody.card_expiration_month:', tokenBody.card_expiration_month);
+    console.log('tokenBody.card_expiration_year:', tokenBody.card_expiration_year);
+    console.log('Full tokenBody:', JSON.stringify(tokenBody, null, 2));
+    console.log('==========================');
 
     let result;
     try {
+      // Log final antes de enviar ao SDK
+      console.log('=== SENDING TO MERCADOPAGO SDK ===');
+      console.log('tokenBody before SDK call:', JSON.stringify(tokenBody, null, 2));
+      console.log('card_expiration_month value:', tokenBody.card_expiration_month);
+      console.log('card_expiration_month type:', typeof tokenBody.card_expiration_month);
+      console.log('card_expiration_month length:', String(tokenBody.card_expiration_month).length);
+      
       result = await cardToken.create({
         body: tokenBody as Parameters<typeof cardToken.create>[0]['body'],
       });
