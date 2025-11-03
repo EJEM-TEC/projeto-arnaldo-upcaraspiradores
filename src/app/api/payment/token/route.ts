@@ -46,9 +46,48 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    const result = await cardToken.create({
-      body: tokenBody as Parameters<typeof cardToken.create>[0]['body'],
+    console.log('Creating card token with data:', {
+      card_number: `${cleanedCardNumber.substring(0, 4)}****${cleanedCardNumber.substring(cleanedCardNumber.length - 4)}`,
+      cardholder_name: cardholderName,
+      card_expiration_month: tokenBody.card_expiration_month,
+      card_expiration_year: tokenBody.card_expiration_year,
+      has_identification: !!tokenBody.cardholder_identification,
     });
+
+    let result;
+    try {
+      result = await cardToken.create({
+        body: tokenBody as Parameters<typeof cardToken.create>[0]['body'],
+      });
+      console.log('Card token created successfully:', result.id);
+    } catch (tokenError: unknown) {
+      console.error('Card token creation error:', tokenError);
+      
+      // Captura detalhes do erro do MercadoPago
+      let errorDetails = 'Unknown error';
+      if (tokenError && typeof tokenError === 'object') {
+        if ('message' in tokenError) {
+          errorDetails = String(tokenError.message);
+        }
+        if ('cause' in tokenError && tokenError.cause) {
+          console.error('Token error cause:', tokenError.cause);
+        }
+        if ('status' in tokenError) {
+          console.error('Token error status:', tokenError.status);
+        }
+        if ('response' in tokenError) {
+          console.error('Token error response:', tokenError.response);
+        }
+      }
+      
+      return NextResponse.json(
+        { 
+          error: 'Erro ao criar token do cartão',
+          details: errorDetails 
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       token: result.id,
@@ -56,9 +95,32 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating card token:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create card token';
+    
+    // Captura mais detalhes do erro
+    let errorMessage = 'Failed to create card token';
+    let errorDetails: unknown = null;
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      };
+    } else if (error && typeof error === 'object') {
+      errorDetails = error;
+      if ('message' in error) {
+        errorMessage = String(error.message);
+      }
+    }
+    
+    console.error('Full error details:', JSON.stringify(errorDetails, null, 2));
+    
     return NextResponse.json(
-      { error: errorMessage },
+      { 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
+      },
       { status: 500 }
     );
   }

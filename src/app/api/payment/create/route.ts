@@ -77,28 +77,64 @@ export async function POST(request: NextRequest) {
       paymentData.token = cardToken;
       paymentData.installments = 1;
       
-      // Detecta a bandeira do cartão se o número foi fornecido
-      // Caso contrário, deixa o MercadoPago determinar automaticamente
-      if (body.cardNumber) {
-        const cardBrand = detectCardBrand(body.cardNumber);
-        paymentData.payment_method_id = cardBrand;
-      }
-      // Se não tiver o número, o MercadoPago determinará a bandeira pelo token
+      // NOTA: Não enviamos payment_method_id quando usamos token
+      // O MercadoPago detecta automaticamente a bandeira pelo token
+      // Se enviarmos ambos, pode causar conflito
     }
 
     // Cria o pagamento no Mercado Pago
     const payment = createPaymentClient();
-    const result = await payment.create({ body: paymentData });
+    
+    console.log('Creating payment with data:', JSON.stringify(paymentData, null, 2));
+    
+    let result;
+    try {
+      result = await payment.create({ body: paymentData });
+      console.log('Payment created successfully:', result.id, result.status);
+    } catch (paymentError: unknown) {
+      console.error('Payment creation error:', paymentError);
+      
+      // Captura detalhes do erro do MercadoPago
+      let errorDetails = 'Unknown error';
+      if (paymentError && typeof paymentError === 'object') {
+        if ('message' in paymentError) {
+          errorDetails = String(paymentError.message);
+        }
+        if ('cause' in paymentError && paymentError.cause) {
+          console.error('Payment error cause:', paymentError.cause);
+        }
+        // Se for um erro do MercadoPago SDK, pode ter mais informações
+        if ('status' in paymentError) {
+          console.error('Payment error status:', paymentError.status);
+        }
+        if ('response' in paymentError) {
+          console.error('Payment error response:', paymentError.response);
+        }
+      }
+      
+      return NextResponse.json(
+        { 
+          error: 'Erro ao processar pagamento no Mercado Pago',
+          details: errorDetails 
+        },
+        { status: 500 }
+      );
+    }
 
     // Se o pagamento foi criado com sucesso, cria a transação no banco
-    if (result.id) {
-      await createTransaction({
-        user_id: userId || null,
-        amount: amountValue,
-        type: 'entrada',
-        description: `Pagamento via ${paymentMethod} - ID: ${result.id} - Status: ${result.status}`,
-        payment_method: paymentMethod,
-      });
+    if (result && result.id) {
+      try {
+        await createTransaction({
+          user_id: userId || null,
+          amount: amountValue,
+          type: 'entrada',
+          description: `Pagamento via ${paymentMethod} - ID: ${result.id} - Status: ${result.status}`,
+          payment_method: paymentMethod,
+        });
+      } catch (transactionError) {
+        console.error('Error creating transaction in database:', transactionError);
+        // Não falha o pagamento se apenas a transação no banco falhar
+      }
 
       // Retorna dados específicos baseado no método de pagamento
       const response: {
@@ -128,14 +164,37 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to create payment' },
+      { error: 'Failed to create payment - no payment ID returned' },
       { status: 500 }
     );
   } catch (error) {
     console.error('Error creating payment:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    
+    // Captura mais detalhes do erro
+    let errorMessage = 'Internal server error';
+    let errorDetails: unknown = null;
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      };
+    } else if (error && typeof error === 'object') {
+      errorDetails = error;
+      if ('message' in error) {
+        errorMessage = String(error.message);
+      }
+    }
+    
+    console.error('Full error details:', JSON.stringify(errorDetails, null, 2));
+    
     return NextResponse.json(
-      { error: errorMessage },
+      { 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
+      },
       { status: 500 }
     );
   }

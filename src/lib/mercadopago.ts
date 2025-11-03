@@ -11,7 +11,8 @@ export function getMercadoPagoClient() {
   return new MercadoPagoConfig({
     accessToken,
     options: {
-      timeout: 5000,
+      timeout: 30000, // Aumentado para 30 segundos
+      idempotencyKey: undefined, // Será definido por requisição se necessário
     },
   });
 }
