@@ -6,7 +6,6 @@ import { detectCardBrand } from '@/lib/cardUtils';
 interface PaymentData {
   transaction_amount: number;
   description: string;
-  currency_id?: string;
   payment_method_id?: string;
   payer: {
     email: string;
@@ -56,10 +55,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Monta os dados do pagamento baseado no método
+    // NOTA: O SDK do Mercado Pago define a moeda automaticamente baseado no Access Token
+    // Não é necessário enviar currency_id
     const paymentData: PaymentData = {
       transaction_amount: amountValue,
       description: description || `Crédito adicionado - ${paymentMethod}`,
-      currency_id: 'BRL', // Moeda brasileira
       statement_descriptor: 'UpCar Aspiradores',
       payer: {
         email: payerEmail,
@@ -102,7 +102,6 @@ export async function POST(request: NextRequest) {
     try {
       console.log('Sending payment to MercadoPago:', JSON.stringify({
         transaction_amount: paymentData.transaction_amount,
-        currency_id: paymentData.currency_id,
         description: paymentData.description,
         payment_method: paymentMethod,
         has_token: !!paymentData.token,
