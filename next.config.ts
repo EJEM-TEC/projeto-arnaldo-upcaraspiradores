@@ -1,11 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Adicione aqui suas configurações personalizadas do Next.js se houver
 };
 
-module.exports = {
-  // ...outras configs,
-  turbo: false,
-}
 export default nextConfig;

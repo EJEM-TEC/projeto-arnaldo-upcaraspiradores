@@ -32,6 +32,16 @@ export default function Dashboard() {
   const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [loadingBilling, setLoadingBilling] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<'today' | 'week' | 'month' | 'year'>('month');
+  const [historyStart, setHistoryStart] = useState<string>('');
+  const [historyEnd, setHistoryEnd] = useState<string>('');
+  const [expandedMachines, setExpandedMachines] = useState<Record<number, boolean>>({});
+  const [machineStats, setMachineStats] = useState<Record<number, {
+    totalActivations: number;
+    totalUsageMinutes: number;
+    voltage: string | number | null;
+    last_cleaning: string | null;
+    created_at: string | null;
+  }>>({});
 
   useEffect(() => {
     const view = searchParams.get('view');
@@ -47,13 +57,31 @@ export default function Dashboard() {
     const fetchMachines = async () => {
       if (currentView === 'equipamentos' || currentView === 'adicionar_maquina') {
         setLoadingMachines(true);
-        const { data, error } = await getAllMachines();
-        if (error) {
-          console.error('Erro ao buscar máquinas:', error);
-        } else {
-          setMachines(data || []);
+        try {
+          const { data, error } = await getAllMachines();
+          console.log('Resultado getAllMachines:', { data, error });
+          
+          if (error) {
+            console.error('Erro ao buscar máquinas:', error);
+            const errorAny = error as any;
+            console.error('Detalhes do erro:', {
+              message: error.message,
+              code: errorAny.code,
+              details: errorAny.details,
+              hint: errorAny.hint
+            });
+            // Ainda assim, tenta definir como array vazio para não quebrar
+            setMachines([]);
+          } else {
+            console.log('Máquinas encontradas:', data);
+            setMachines(data || []);
+          }
+        } catch (err) {
+          console.error('Erro inesperado ao buscar máquinas:', err);
+          setMachines([]);
+        } finally {
+          setLoadingMachines(false);
         }
-        setLoadingMachines(false);
       }
     };
 
@@ -65,7 +93,9 @@ export default function Dashboard() {
     const fetchActivationHistory = async () => {
       if (currentView === 'historico_acionamentos') {
         setLoadingHistory(true);
-        const { data, error } = await getAllActivationHistory();
+        const startIso = historyStart ? new Date(historyStart).toISOString() : undefined;
+        const endIso = historyEnd ? new Date(new Date(historyEnd).setHours(23,59,59,999)).toISOString() : undefined;
+        const { data, error } = await getAllActivationHistory(startIso, endIso);
         if (error) {
           console.error('Erro ao buscar histórico de acionamentos:', error);
         } else {
@@ -76,7 +106,7 @@ export default function Dashboard() {
     };
 
     fetchActivationHistory();
-  }, [currentView]);
+  }, [currentView, historyStart, historyEnd]);
 
 
   // Buscar dados de faturamento quando a view for faturamento
@@ -123,6 +153,29 @@ export default function Dashboard() {
     fetchBillingData();
   }, [currentView, billingPeriod]);
 
+  useEffect(() => {
+    const loadStats = async () => {
+      if (currentView === 'equipamentos' && machines.length > 0) {
+        console.log('Carregando estatísticas para', machines.length, 'máquinas');
+        const { getMachineStats } = await import('@/lib/database');
+        const entries = await Promise.all(
+          machines.map(async (m) => {
+            const { data } = await getMachineStats(m.id);
+            return [m.id, data] as const;
+          })
+        );
+        const map: Record<number, any> = {};
+        entries.forEach(([id, data]) => { map[id] = data; });
+        setMachineStats(map);
+        console.log('Estatísticas carregadas:', map);
+      } else {
+        // Limpar estatísticas quando não estiver na view de equipamentos
+        setMachineStats({});
+      }
+    };
+    loadStats();
+  }, [currentView, machines]);
+
   const fetchClientName = async (id: string) => {
     if (!id.trim()) {
       setClientName('');
@@ -145,6 +198,75 @@ export default function Dashboard() {
     const value = e.target.value;
     setClientId(value);
     fetchClientName(value);
+  };
+
+  const handleDownloadMachinePdf = async (machineId: number) => {
+    try {
+      const { getActivationHistoryByMachine } = await import('@/lib/database');
+      const { data: history } = await getActivationHistoryByMachine(machineId);
+      
+      // Tentar importar jsPDF dinamicamente
+      let jsPdfMod;
+      try {
+        // @ts-ignore - import dinâmico pode não ter tipos
+        jsPdfMod = await import('jspdf');
+      } catch (importError) {
+        alert('Biblioteca jsPDF não encontrada. Execute: npm install jspdf');
+        return;
+      }
+
+      // @ts-ignore - jsPDF pode ter estrutura variável
+      const jsPDF = (jsPdfMod && (jsPdfMod.default || jsPdfMod)) as any;
+      const doc = new jsPDF();
+
+      const machine = machines.find(m => m.id === machineId);
+      const stats = machineStats[machineId];
+
+      let y = 15;
+      doc.setFontSize(16);
+      doc.text(`Relatório da Máquina #${machineId}`, 14, y);
+      y += 8;
+
+      doc.setFontSize(12);
+      doc.text(`Localização: ${machine?.location || '-'}`, 14, y); y += 6;
+      doc.text(`Status (Raspberry): ${machine?.status || 'ativo'}`, 14, y); y += 6;
+      doc.text(`Voltagem: ${stats?.voltage ?? '-'}`, 14, y); y += 6;
+      doc.text(`Última limpeza: ${stats?.last_cleaning ? new Date(stats.last_cleaning).toLocaleDateString('pt-BR') : '-'}`, 14, y); y += 6;
+      doc.text(`Total de acionamentos: ${stats?.totalActivations ?? 0}`, 14, y); y += 6;
+      doc.text(`Tempo total de uso: ${(stats?.totalUsageMinutes ?? 0)} min`, 14, y); y += 6;
+      doc.text(`Cadastrada em: ${stats?.created_at ? new Date(stats.created_at).toLocaleDateString('pt-BR') : (machine?.created_at ? new Date(machine.created_at).toLocaleDateString('pt-BR') : '-')}`, 14, y); y += 10;
+
+      doc.setFontSize(14);
+      doc.text('Histórico de Acionamentos', 14, y); y += 8;
+
+      doc.setFontSize(11);
+      doc.text('Data/Hora                Comando   Duração   Temp.Média   Status', 14, y); y += 6;
+      doc.setLineWidth(0.1);
+      doc.line(14, y, 196, y); y += 4;
+
+      const rows = (history || []).slice(0, 200); // limitar para caber
+      for (const item of rows) {
+        const start = item.started_at ? new Date(item.started_at).toLocaleString('pt-BR') : '-';
+        const cmd = item.command || '-';
+        const dur = item.duration_minutes != null ? `${item.duration_minutes}m` : '-';
+        const temp = item.average_temperature != null ? `${Number(item.average_temperature).toFixed(1)}°C` : '-';
+        const st = item.status || '-';
+
+        const line = `${start.padEnd(22)} ${cmd.padEnd(8)} ${String(dur).padEnd(8)} ${String(temp).padEnd(11)} ${st}`;
+        doc.text(line, 14, y);
+        y += 6;
+
+        if (y > 280) {
+          doc.addPage();
+          y = 15;
+        }
+      }
+
+      doc.save(`maquina_${machineId}.pdf`);
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err);
+      alert('Não foi possível gerar o PDF. Verifique se as dependências estão instaladas.');
+    }
   };
 
   const renderContent = () => {
@@ -442,6 +564,16 @@ export default function Dashboard() {
       case 'historico_acionamentos':
         return (
           <>
+            <div className="flex flex-col md:flex-row md:items-end md:space-x-4 mb-4 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data início</label>
+                <input type="date" value={historyStart} onChange={(e) => setHistoryStart(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-md text-gray-900" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data fim</label>
+                <input type="date" value={historyEnd} onChange={(e) => setHistoryEnd(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-md text-gray-900" />
+              </div>
+            </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-6">Histórico de Acionamentos</h2>
             {loadingHistory ? (
               <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
@@ -561,6 +693,13 @@ export default function Dashboard() {
         const activeMachines = machines.filter(m => m.status === 'ativo' || m.status === 'active' || !m.status).length;
         const maintenanceMachines = machines.filter(m => m.status === 'manutenção' || m.status === 'maintenance').length;
 
+        // Debug: log quando a view de equipamentos é renderizada
+        if (machines.length > 0) {
+          console.log('Renderizando view equipamentos com', totalMachines, 'máquinas:', machines.map(m => ({ id: m.id, location: m.location })));
+        }
+
+        const toggleExpand = (id: number) => setExpandedMachines(prev => ({ ...prev, [id]: !prev[id] }));
+
         return (
           <>
             <h2 className="text-3xl font-bold text-gray-900 mb-6">Equipamentos</h2>
@@ -593,8 +732,15 @@ export default function Dashboard() {
               <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                 {machines.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
-                    <p>Nenhuma máquina cadastrada ainda.</p>
-                    <p className="mt-2 text-sm">Use a opção &quot;Adicionar Máquina&quot; no menu para cadastrar.</p>
+                    <p className="font-semibold mb-2">Nenhuma máquina encontrada.</p>
+                    <p className="text-sm mb-4">Verifique:</p>
+                    <ul className="text-sm text-left max-w-md mx-auto space-y-1">
+                      <li>• Se a tabela &quot;machines&quot; existe no Supabase</li>
+                      <li>• Se as políticas RLS (Row Level Security) permitem leitura</li>
+                      <li>• Se há máquinas cadastradas no banco de dados</li>
+                      <li>• Abra o console do navegador (F12) para ver erros detalhados</li>
+                    </ul>
+                    <p className="mt-4 text-sm">Use a opção &quot;Adicionar Máquina&quot; no menu para cadastrar.</p>
                   </div>
                 ) : (
                   <table className="min-w-full divide-y divide-gray-200">
@@ -604,6 +750,7 @@ export default function Dashboard() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Localização</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cadastrada em</th>
+                        <th className="px-6 py-3" />
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -622,17 +769,58 @@ export default function Dashboard() {
                           new Date(machine.created_at).toLocaleDateString('pt-BR') :
                           '-';
 
+                        const stats = machineStats[machine.id];
+
                         return (
-                          <tr key={machine.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{machine.id}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{machine.location || 'Não especificada'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
-                                {statusText}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{createdAt}</td>
-                          </tr>
+                          <>
+                            <tr key={machine.id}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{machine.id}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{machine.location || 'Não especificada'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
+                                  {statusText}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{createdAt}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                <button onClick={() => toggleExpand(machine.id)} className="text-orange-600 hover:text-orange-800">
+                                  {expandedMachines[machine.id] ? 'Fechar' : 'Detalhes'}
+                                </button>
+                              </td>
+                            </tr>
+                            {expandedMachines[machine.id] && (
+                              <tr>
+                                <td colSpan={5} className="px-6 py-4 bg-gray-50">
+                                  <div className="flex justify-end mb-4">
+                                    <button
+                                      onClick={() => handleDownloadMachinePdf(machine.id)}
+                                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md"
+                                    >
+                                      Baixar PDF
+                                    </button>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                      <p className="text-sm text-gray-500">Voltagem</p>
+                                      <p className="text-lg font-semibold text-gray-900">{stats?.voltage ?? '-'}</p>
+                                    </div>
+                                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                      <p className="text-sm text-gray-500">Última limpeza</p>
+                                      <p className="text-lg font-semibold text-gray-900">{stats?.last_cleaning ? new Date(stats.last_cleaning).toLocaleDateString('pt-BR') : '-'}</p>
+                                    </div>
+                                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                      <p className="text-sm text-gray-500">Total de acionamentos</p>
+                                      <p className="text-lg font-semibold text-gray-900">{stats?.totalActivations ?? 0}</p>
+                                    </div>
+                                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                      <p className="text-sm text-gray-500">Tempo total de uso</p>
+                                      <p className="text-lg font-semibold text-gray-900">{stats?.totalUsageMinutes ?? 0} min</p>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </>
                         );
                       })}
                     </tbody>

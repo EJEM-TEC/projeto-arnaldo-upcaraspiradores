@@ -24,7 +24,7 @@ export default function LoginPage() {
             .from('usuarios')
             .select('role')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
 
           // arnaldfirst@gmail.com é sempre admin
           let role = user.email === 'arnaldfirst@gmail.com' ? 'admin' : profile?.role;
@@ -76,7 +76,7 @@ export default function LoginPage() {
             .from('usuarios')
             .select('role')
             .eq('id', data.user.id)
-            .single();
+            .maybeSingle();
 
           // arnaldfirst@gmail.com é sempre admin
           let role = data.user.email === 'arnaldfirst@gmail.com' ? 'admin' : profile?.role;

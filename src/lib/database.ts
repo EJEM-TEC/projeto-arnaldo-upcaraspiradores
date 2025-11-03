@@ -94,7 +94,7 @@ export async function getUserRole(userId: string) {
     .from('usuarios')
     .select('role')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error fetching user role:', error);
@@ -115,17 +115,39 @@ export interface Machine {
 
 // Get all machines
 export async function getAllMachines() {
-  const { data, error } = await supabase
-    .from('machines')
-    .select('*')
-    .order('id', { ascending: true });
+  try {
+    const { data, error } = await supabase
+      .from('machines')
+      .select('*')
+      .order('id', { ascending: true });
 
-  if (error) {
-    console.error('Error fetching machines:', error);
-    return { data: null, error };
+    if (error) {
+      console.error('Error fetching machines:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      
+      // Se o erro for de tabela não encontrada, retorna array vazio
+      const errorMessage = error.message || '';
+      if (errorMessage.toLowerCase().includes('does not exist') || 
+          errorMessage.toLowerCase().includes('relation') && errorMessage.toLowerCase().includes('not exist') ||
+          error.code === '42P01') {
+        console.warn('⚠️ Tabela "machines" não existe ou não está acessível. Verifique as permissões RLS.');
+        return { data: [], error: null };
+      }
+      
+      return { data: null, error };
+    }
+
+    console.log('Machines fetched successfully:', data?.length || 0, 'machines');
+    return { data: data || [], error: null };
+  } catch (err) {
+    console.error('Unexpected error in getAllMachines:', err);
+    return { data: null, error: err as Error };
   }
-
-  return { data, error: null };
 }
 
 // Get machine by ID
@@ -157,37 +179,33 @@ export interface ActivationHistory {
   created_at: string;
 }
 
-// Get all activation history
-export async function getAllActivationHistory() {
-  // Primeiro, busca o histórico
-  const { data: historyData, error: historyError } = await supabase
+// Get all activation history (optional date filters)
+export async function getAllActivationHistory(startDate?: string, endDate?: string) {
+  let query = supabase
     .from('activation_history')
     .select('*')
     .order('started_at', { ascending: false });
+
+  if (startDate) query = query.gte('started_at', startDate);
+  if (endDate) query = query.lte('started_at', endDate);
+
+  const { data: historyData, error: historyError } = await query;
 
   if (historyError) {
     console.error('Error fetching activation history:', historyError);
     return { data: null, error: historyError };
   }
 
-  // Se não houver dados, retorna vazio
   if (!historyData || historyData.length === 0) {
     return { data: [], error: null };
   }
 
-  // Busca as máquinas relacionadas
   const machineIds = [...new Set(historyData.map(h => h.machine_id))];
-  const { data: machinesData, error: machinesError } = await supabase
+  const { data: machinesData } = await supabase
     .from('machines')
     .select('id, location')
     .in('id', machineIds);
 
-  if (machinesError) {
-    console.error('Error fetching machines for history:', machinesError);
-    // Mesmo com erro nas máquinas, retorna o histórico
-  }
-
-  // Combina os dados
   const machinesMap = new Map();
   if (machinesData) {
     machinesData.forEach(m => machinesMap.set(m.id, m));
@@ -199,6 +217,40 @@ export async function getAllActivationHistory() {
   }));
 
   return { data: combinedData, error: null };
+}
+
+export async function getMachineStats(machineId: number) {
+  // total de acionamentos e soma de minutos
+  const { data, error } = await supabase
+    .from('activation_history')
+    .select('duration_minutes, id')
+    .eq('machine_id', machineId);
+
+  if (error) {
+    console.error('Error fetching machine stats:', error);
+    return { data: null, error };
+  }
+
+  const totalActivations = data?.length || 0;
+  const totalUsageMinutes = (data || []).reduce((sum, r) => sum + (r.duration_minutes || 0), 0);
+
+  // última limpeza e voltagem podem não existir no schema; tentar buscar se houver
+  const { data: machineData } = await supabase
+    .from('machines')
+    .select('voltage, last_cleaning, created_at')
+    .eq('id', machineId)
+    .single();
+
+  return {
+    data: {
+      totalActivations,
+      totalUsageMinutes,
+      voltage: machineData?.voltage ?? null,
+      last_cleaning: machineData?.last_cleaning ?? null,
+      created_at: machineData?.created_at ?? null,
+    },
+    error: null,
+  };
 }
 
 // Get activation history by machine ID
