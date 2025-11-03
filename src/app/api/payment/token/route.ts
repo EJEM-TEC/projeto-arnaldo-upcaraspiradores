@@ -39,9 +39,18 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    // O Mercado Pago aceita tanto string quanto número, mas vamos enviar como string com 2 dígitos
-    // para garantir compatibilidade: "01" a "12"
+    // O Mercado Pago SDK espera o mês como STRING com 2 dígitos (ex: "01", "11")
+    // Mas vamos garantir que seja sempre uma string válida
     const expirationMonth = String(monthNum).padStart(2, '0');
+    
+    // Validação extra: garante que não está vazio
+    if (!expirationMonth || expirationMonth.trim() === '' || expirationMonth.length !== 2) {
+      console.error('ERROR: expirationMonth is invalid after processing:', expirationMonth);
+      return NextResponse.json(
+        { error: 'Mês de expiração inválido após processamento' },
+        { status: 400 }
+      );
+    }
 
     // Valida e formata o ano de expiração
     if (!cardExpirationYear) {
@@ -71,7 +80,8 @@ export async function POST(request: NextRequest) {
     const cardToken = createCardTokenClient();
     
     // Prepara o body com os tipos corretos
-    // IMPORTANTE: Verificar se o campo está realmente sendo preenchido
+    // O Mercado Pago SDK espera os campos específicos com nomes exatos
+    // Vamos criar o objeto de forma explícita para garantir que todos os campos estão presentes
     const tokenBody: {
       card_number: string;
       cardholder_name: string;
@@ -83,18 +93,29 @@ export async function POST(request: NextRequest) {
         number: string;
       };
     } = {
-      card_number: cleanedCardNumber,
-      cardholder_name: cardholderName,
-      card_expiration_month: expirationMonth, // String com 2 dígitos (ex: "01", "12")
-      card_expiration_year: expirationYear, // String com 4 dígitos (ex: "2025")
-      security_code: String(securityCode),
+      card_number: String(cleanedCardNumber).trim(),
+      cardholder_name: String(cardholderName).trim(),
+      card_expiration_month: String(expirationMonth).trim(), // OBRIGATÓRIO: String "01" a "12"
+      card_expiration_year: String(expirationYear).trim(), // OBRIGATÓRIO: String "2025", "2026", etc
+      security_code: String(securityCode).trim(),
     };
     
-    // Validação de segurança: verifica se o mês não está vazio antes de enviar
-    if (!expirationMonth || expirationMonth.trim() === '' || expirationMonth === '00') {
-      console.error('ERROR: expirationMonth is empty or invalid:', expirationMonth);
+    // Validação FINAL: verifica se todos os campos obrigatórios estão presentes e não vazios
+    if (!tokenBody.card_expiration_month || 
+        tokenBody.card_expiration_month.trim() === '' || 
+        tokenBody.card_expiration_month.length !== 2 ||
+        tokenBody.card_expiration_month === '00') {
+      console.error('ERROR: card_expiration_month is empty or invalid:', tokenBody.card_expiration_month);
       return NextResponse.json(
-        { error: 'Mês de expiração inválido ou vazio' },
+        { error: `Mês de expiração inválido: "${tokenBody.card_expiration_month}"` },
+        { status: 400 }
+      );
+    }
+    
+    if (!tokenBody.card_expiration_year || tokenBody.card_expiration_year.trim() === '') {
+      console.error('ERROR: card_expiration_year is empty or invalid:', tokenBody.card_expiration_year);
+      return NextResponse.json(
+        { error: 'Ano de expiração inválido' },
         { status: 400 }
       );
     }
@@ -109,28 +130,66 @@ export async function POST(request: NextRequest) {
 
     // Log detalhado do que será enviado
     console.log('=== CARD TOKEN REQUEST ===');
-    console.log('Raw input - month:', cardExpirationMonth, 'type:', typeof cardExpirationMonth);
-    console.log('Raw input - year:', cardExpirationYear, 'type:', typeof cardExpirationYear);
-    console.log('Processed - month:', expirationMonth, 'type:', typeof expirationMonth, 'length:', expirationMonth.length);
-    console.log('Processed - year:', expirationYear, 'type:', typeof expirationYear, 'length:', expirationYear.length);
-    console.log('tokenBody.card_expiration_month:', tokenBody.card_expiration_month);
-    console.log('tokenBody.card_expiration_year:', tokenBody.card_expiration_year);
-    console.log('Full tokenBody:', JSON.stringify(tokenBody, null, 2));
+    console.log('Input recebido:');
+    console.log('  - cardExpirationMonth:', cardExpirationMonth, '(type:', typeof cardExpirationMonth, ')');
+    console.log('  - cardExpirationYear:', cardExpirationYear, '(type:', typeof cardExpirationYear, ')');
+    console.log('Processado:');
+    console.log('  - expirationMonth:', expirationMonth, '(type:', typeof expirationMonth, ', length:', expirationMonth.length, ')');
+    console.log('  - expirationYear:', expirationYear, '(type:', typeof expirationYear, ', length:', expirationYear.length, ')');
+    console.log('TokenBody final:');
+    console.log('  - card_expiration_month:', tokenBody.card_expiration_month, '(type:', typeof tokenBody.card_expiration_month, ')');
+    console.log('  - card_expiration_year:', tokenBody.card_expiration_year, '(type:', typeof tokenBody.card_expiration_year, ')');
+    console.log('TokenBody completo (JSON):');
+    console.log(JSON.stringify(tokenBody, null, 2));
     console.log('==========================');
 
     let result;
     try {
-      // Log final antes de enviar ao SDK
+      // Log final antes de enviar ao SDK com verificação adicional
       console.log('=== SENDING TO MERCADOPAGO SDK ===');
-      console.log('tokenBody before SDK call:', JSON.stringify(tokenBody, null, 2));
-      console.log('card_expiration_month value:', tokenBody.card_expiration_month);
-      console.log('card_expiration_month type:', typeof tokenBody.card_expiration_month);
-      console.log('card_expiration_month length:', String(tokenBody.card_expiration_month).length);
+      console.log('Verificando campos antes de enviar:');
+      console.log('  card_expiration_month:', JSON.stringify(tokenBody.card_expiration_month));
+      console.log('  card_expiration_month existe?', 'card_expiration_month' in tokenBody);
+      console.log('  card_expiration_month é undefined?', tokenBody.card_expiration_month === undefined);
+      console.log('  card_expiration_month é null?', tokenBody.card_expiration_month === null);
+      console.log('  card_expiration_month é vazio?', tokenBody.card_expiration_month === '');
+      console.log('TokenBody completo para envio:');
+      console.log(JSON.stringify(tokenBody, null, 2));
+      
+      // Garante que o campo está presente antes de enviar - cria uma cópia explícita
+      const finalBody: {
+        card_number: string;
+        cardholder_name: string;
+        card_expiration_month: string;
+        card_expiration_year: string;
+        security_code: string;
+        cardholder_identification?: {
+          type: string;
+          number: string;
+        };
+      } = {
+        card_number: tokenBody.card_number,
+        cardholder_name: tokenBody.cardholder_name,
+        card_expiration_month: tokenBody.card_expiration_month, // DEVE SER "01" a "12"
+        card_expiration_year: tokenBody.card_expiration_year,
+        security_code: tokenBody.security_code,
+      };
+      
+      // Adiciona identificação se presente
+      if (tokenBody.cardholder_identification) {
+        finalBody.cardholder_identification = tokenBody.cardholder_identification;
+      }
+      
+      console.log('Final body que será enviado:');
+      console.log(JSON.stringify(finalBody, null, 2));
+      console.log('card_expiration_month no final:', finalBody.card_expiration_month);
+      console.log('card_expiration_month tipo:', typeof finalBody.card_expiration_month);
+      console.log('card_expiration_month comprimento:', finalBody.card_expiration_month.length);
       
       result = await cardToken.create({
-        body: tokenBody as Parameters<typeof cardToken.create>[0]['body'],
+        body: finalBody as Parameters<typeof cardToken.create>[0]['body'],
       });
-      console.log('Card token created successfully:', result.id);
+      console.log('✅ Card token created successfully:', result.id);
     } catch (tokenError: unknown) {
       console.error('Card token creation error:', tokenError);
       
