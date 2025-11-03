@@ -143,6 +143,35 @@ export async function POST(request: NextRequest) {
     console.log(JSON.stringify(tokenBody, null, 2));
     console.log('==========================');
 
+    // Prepara o body final antes do try para que possa ser usado no catch
+    // TESTE: Vamos tentar enviar expiration_month como NÚMERO (conforme documentação)
+    // O Mercado Pago pode esperar número inteiro (1-12) em vez de string
+    const expirationMonthAsNumber = monthNum; // Já temos o número válido (1-12)
+    
+    const finalBody: {
+      card_number: string;
+      cardholder_name: string;
+      card_expiration_month: string | number; // Tenta como número primeiro
+      card_expiration_year: string;
+      security_code: string;
+      cardholder_identification?: {
+        type: string;
+        number: string;
+      };
+    } = {
+      card_number: tokenBody.card_number,
+      cardholder_name: tokenBody.cardholder_name,
+      // TENTATIVA: Enviar como NÚMERO (conforme documentação do Mercado Pago)
+      card_expiration_month: expirationMonthAsNumber, // Número inteiro 1-12
+      card_expiration_year: tokenBody.card_expiration_year,
+      security_code: tokenBody.security_code,
+    };
+    
+    // Adiciona identificação se presente
+    if (tokenBody.cardholder_identification) {
+      finalBody.cardholder_identification = tokenBody.cardholder_identification;
+    }
+    
     let result;
     try {
       // Log final antes de enviar ao SDK com verificação adicional
@@ -156,64 +185,80 @@ export async function POST(request: NextRequest) {
       console.log('TokenBody completo para envio:');
       console.log(JSON.stringify(tokenBody, null, 2));
       
-      // Garante que o campo está presente antes de enviar - cria uma cópia explícita
-      const finalBody: {
-        card_number: string;
-        cardholder_name: string;
-        card_expiration_month: string;
-        card_expiration_year: string;
-        security_code: string;
-        cardholder_identification?: {
-          type: string;
-          number: string;
-        };
-      } = {
-        card_number: tokenBody.card_number,
-        cardholder_name: tokenBody.cardholder_name,
-        card_expiration_month: tokenBody.card_expiration_month, // DEVE SER "01" a "12"
-        card_expiration_year: tokenBody.card_expiration_year,
-        security_code: tokenBody.security_code,
-      };
-      
-      // Adiciona identificação se presente
-      if (tokenBody.cardholder_identification) {
-        finalBody.cardholder_identification = tokenBody.cardholder_identification;
-      }
-      
       console.log('Final body que será enviado:');
       console.log(JSON.stringify(finalBody, null, 2));
       console.log('card_expiration_month no final:', finalBody.card_expiration_month);
       console.log('card_expiration_month tipo:', typeof finalBody.card_expiration_month);
-      console.log('card_expiration_month comprimento:', finalBody.card_expiration_month.length);
+      console.log('card_expiration_month valor numérico original:', monthNum);
+      console.log('card_expiration_month como string seria:', String(monthNum).padStart(2, '0'));
       
       result = await cardToken.create({
         body: finalBody as Parameters<typeof cardToken.create>[0]['body'],
       });
       console.log('✅ Card token created successfully:', result.id);
     } catch (tokenError: unknown) {
-      console.error('Card token creation error:', tokenError);
+      console.error('=== ERRO AO CRIAR TOKEN DO CARTÃO ===');
+      console.error('❌ Card token creation error:', tokenError);
+      
+      // LOG CRÍTICO: Mostra exatamente o que foi enviado quando houve erro
+      console.error('=== PAYLOAD ENVIADO AO MERCADO PAGO (QUE RESULTOU EM ERRO) ===');
+      console.error(JSON.stringify(finalBody, null, 2));
+      console.error('=== DETALHES DO PAYLOAD ===');
+      console.error('card_expiration_month:', finalBody.card_expiration_month);
+      console.error('card_expiration_month tipo:', typeof finalBody.card_expiration_month);
+      console.error('card_expiration_month existe?', 'card_expiration_month' in finalBody);
+      console.error('card_expiration_year:', finalBody.card_expiration_year);
+      console.error('card_expiration_year tipo:', typeof finalBody.card_expiration_year);
+      console.error('Todos os campos do finalBody:', Object.keys(finalBody));
+      console.error('Valores de todos os campos:', Object.entries(finalBody));
+      console.error('==========================================');
       
       // Captura detalhes do erro do MercadoPago
       let errorDetails = 'Unknown error';
+      let errorResponse: unknown = null;
+      
       if (tokenError && typeof tokenError === 'object') {
         if ('message' in tokenError) {
           errorDetails = String(tokenError.message);
+          console.error('Erro message:', errorDetails);
         }
         if ('cause' in tokenError && tokenError.cause) {
           console.error('Token error cause:', tokenError.cause);
+          errorResponse = tokenError.cause;
         }
         if ('status' in tokenError) {
           console.error('Token error status:', tokenError.status);
         }
-        if ('response' in tokenError) {
-          console.error('Token error response:', tokenError.response);
+        if ('response' in tokenError && tokenError.response) {
+          const response = tokenError.response as Record<string, unknown>;
+          console.error('Token error response completo:', JSON.stringify(response, null, 2));
+          
+          // Tenta extrair o body da resposta do erro
+          if ('body' in response && response.body) {
+            console.error('Response body (erro do MercadoPago):', JSON.stringify(response.body, null, 2));
+            errorResponse = response.body;
+          }
+          
+          // Tenta extrair status code
+          if ('status' in response) {
+            console.error('HTTP Status Code:', response.status);
+          }
         }
+        
+        // Log completo do erro
+        console.error('=== ERRO COMPLETO ===');
+        console.error(JSON.stringify(tokenError, null, 2));
       }
       
       return NextResponse.json(
         { 
           error: 'Erro ao criar token do cartão',
-          details: errorDetails 
+          details: errorDetails,
+          // Em desenvolvimento, mostra o payload que foi enviado
+          ...(process.env.NODE_ENV === 'development' && {
+            sentPayload: finalBody,
+            errorResponse: errorResponse
+          })
         },
         { status: 500 }
       );
