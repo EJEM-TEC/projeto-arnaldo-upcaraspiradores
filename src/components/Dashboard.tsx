@@ -433,7 +433,7 @@ export default function Dashboard() {
             ) : (
               <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
                 <p className="text-gray-500">Não foi possível carregar os dados de faturamento.</p>
-                <p className="text-gray-400 text-sm mt-2">Verifique se a tabela 'transactions' foi criada no Supabase.</p>
+                <p className="text-gray-400 text-sm mt-2">Verifique se a tabela &apos;transactions&apos; foi criada no Supabase.</p>
               </div>
             )}
           </>
@@ -594,7 +594,7 @@ export default function Dashboard() {
                 {machines.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
                     <p>Nenhuma máquina cadastrada ainda.</p>
-                    <p className="mt-2 text-sm">Use a opção "Adicionar Máquina" no menu para cadastrar.</p>
+                    <p className="mt-2 text-sm">Use a opção &quot;Adicionar Máquina&quot; no menu para cadastrar.</p>
                   </div>
                 ) : (
                   <table className="min-w-full divide-y divide-gray-200">
