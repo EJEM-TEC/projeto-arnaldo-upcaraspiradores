@@ -15,6 +15,21 @@ interface ActivationHistoryWithMachine extends ActivationHistory {
   } | null;
 }
 
+interface SupabaseError {
+  message: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+}
+
+type MachineStats = {
+  totalActivations: number;
+  totalUsageMinutes: number;
+  voltage: string | number | null;
+  last_cleaning: string | null;
+  created_at: string | null;
+};
+
 type DashboardView = 'adicionar_credito' | 'faturamento' | 'historico_acionamentos' | 'equipamentos' | 'alterar_senha' | 'adicionar_maquina';
 
 export default function Dashboard() {
@@ -35,13 +50,7 @@ export default function Dashboard() {
   const [historyStart, setHistoryStart] = useState<string>('');
   const [historyEnd, setHistoryEnd] = useState<string>('');
   const [expandedMachines, setExpandedMachines] = useState<Record<number, boolean>>({});
-  const [machineStats, setMachineStats] = useState<Record<number, {
-    totalActivations: number;
-    totalUsageMinutes: number;
-    voltage: string | number | null;
-    last_cleaning: string | null;
-    created_at: string | null;
-  }>>({});
+  const [machineStats, setMachineStats] = useState<Record<number, MachineStats>>({});
 
   useEffect(() => {
     const view = searchParams.get('view');
@@ -63,12 +72,12 @@ export default function Dashboard() {
           
           if (error) {
             console.error('Erro ao buscar máquinas:', error);
-            const errorAny = error as any;
+            const supabaseError = error as unknown as SupabaseError;
             console.error('Detalhes do erro:', {
               message: error.message,
-              code: errorAny.code,
-              details: errorAny.details,
-              hint: errorAny.hint
+              code: supabaseError.code,
+              details: supabaseError.details,
+              hint: supabaseError.hint
             });
             // Ainda assim, tenta definir como array vazio para não quebrar
             setMachines([]);
@@ -164,9 +173,9 @@ export default function Dashboard() {
             return [m.id, data] as const;
           })
         );
-        const map: Record<number, any> = {};
+        const map: Record<number, MachineStats | null> = {};
         entries.forEach(([id, data]) => { map[id] = data; });
-        setMachineStats(map);
+        setMachineStats(map as Record<number, MachineStats>);
         console.log('Estatísticas carregadas:', map);
       } else {
         // Limpar estatísticas quando não estiver na view de equipamentos
@@ -206,17 +215,32 @@ export default function Dashboard() {
       const { data: history } = await getActivationHistoryByMachine(machineId);
       
       // Tentar importar jsPDF dinamicamente
-      let jsPdfMod;
+      type JsPDFModule = {
+        default?: {
+          new (): JsPDFInstance;
+        };
+        new (): JsPDFInstance;
+      };
+      
+      type JsPDFInstance = {
+        setFontSize: (size: number) => void;
+        text: (text: string, x: number, y: number) => void;
+        setLineWidth: (width: number) => void;
+        line: (x1: number, y1: number, x2: number, y2: number) => void;
+        addPage: () => void;
+        save: (filename: string) => void;
+      };
+
+      let jsPdfMod: JsPDFModule;
       try {
-        // @ts-ignore - import dinâmico pode não ter tipos
-        jsPdfMod = await import('jspdf');
-      } catch (importError) {
+        jsPdfMod = (await import('jspdf') as unknown) as JsPDFModule;
+      } catch {
         alert('Biblioteca jsPDF não encontrada. Execute: npm install jspdf');
         return;
       }
 
-      // @ts-ignore - jsPDF pode ter estrutura variável
-      const jsPDF = (jsPdfMod && (jsPdfMod.default || jsPdfMod)) as any;
+      const JsPDFClass = (jsPdfMod.default || jsPdfMod) as new () => JsPDFInstance;
+      const jsPDF = JsPDFClass;
       const doc = new jsPDF();
 
       const machine = machines.find(m => m.id === machineId);
@@ -289,24 +313,17 @@ export default function Dashboard() {
           try {
             // Buscar o UUID do usuário pelo ID (assumindo que clientId é o ID na tabela usuarios)
             // Se não encontrar, criar transação sem user_id
-            let userId = null;
+            let userId: string | null = null;
             if (clientId.trim()) {
-              try {
-                const clientIdNum = parseInt(clientId);
-                // Se for um número, pode ser que precise buscar de outra forma
-                // Por enquanto, vamos usar o clientId como está se for UUID
-                userId = clientId.trim();
-              } catch {
-                // Se não for um número, assume que é UUID
-                userId = clientId.trim();
-              }
+              // Usar o clientId como está (pode ser UUID ou ID numérico)
+              userId = clientId.trim();
             }
 
             const description = clientName
               ? `Crédito adicionado para ${clientName}`
               : `Crédito adicionado - Cliente ID: ${clientId}`;
 
-            const { data, error } = await createTransaction({
+            const { error } = await createTransaction({
               user_id: userId || undefined,
               amount: amountValue,
               type: 'entrada',
