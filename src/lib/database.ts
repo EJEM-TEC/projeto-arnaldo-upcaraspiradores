@@ -1,8 +1,10 @@
 import { supabase } from './supabaseClient';
-import { PostgrestError } from '@supabase/supabase-js';
 
-interface SupabaseErrorWithHint extends PostgrestError {
+interface SupabaseErrorWithHint {
+  code?: string;
+  message: string;
   hint?: string;
+  details?: string;
 }
 
 export interface usuarios {
@@ -458,7 +460,7 @@ export interface BillingData {
 
 // Get billing data for a specific period
 export async function getBillingData(startDate: string, endDate: string) {
-  let query = supabase
+  const query = supabase
     .from('transactions')
     .select('*')
     .gte('created_at', startDate)
@@ -470,7 +472,8 @@ export async function getBillingData(startDate: string, endDate: string) {
   if (error) {
     // Se a tabela não existe, retorna dados zerados
     const errorMessage = error.message || JSON.stringify(error);
-    const errorCode = error.code || (error as any).hint;
+    const errorWithHint = error as SupabaseErrorWithHint;
+    const errorCode = error.code || errorWithHint.hint;
     
     if (errorCode === '42P01' || 
         errorMessage?.toLowerCase().includes('does not exist') ||
