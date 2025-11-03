@@ -86,7 +86,12 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
             const paymentData = await paymentResponse.json();
 
             if (!paymentResponse.ok) {
-                throw new Error(paymentData.error || 'Erro ao processar pagamento');
+                // Monta mensagem de erro mais detalhada
+                let errorMessage = paymentData.error || 'Erro ao processar pagamento';
+                if (paymentData.details) {
+                    errorMessage += `: ${paymentData.details}`;
+                }
+                throw new Error(errorMessage);
             }
 
             if (paymentData.status === 'approved') {

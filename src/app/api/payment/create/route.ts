@@ -6,6 +6,7 @@ import { detectCardBrand } from '@/lib/cardUtils';
 interface PaymentData {
   transaction_amount: number;
   description: string;
+  currency_id?: string;
   payment_method_id?: string;
   payer: {
     email: string;
@@ -45,13 +46,23 @@ export async function POST(request: NextRequest) {
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
       'https://projeto-arnaldo-upcaraspiradores.vercel.app';
 
+    // Valida email do pagador
+    const payerEmail = payer?.email || 'payer@example.com';
+    if (!payerEmail || !payerEmail.includes('@')) {
+      return NextResponse.json(
+        { error: 'Email inválido do pagador' },
+        { status: 400 }
+      );
+    }
+
     // Monta os dados do pagamento baseado no método
     const paymentData: PaymentData = {
       transaction_amount: amountValue,
       description: description || `Crédito adicionado - ${paymentMethod}`,
+      currency_id: 'BRL', // Moeda brasileira
       statement_descriptor: 'UpCar Aspiradores',
       payer: {
-        email: payer?.email || 'payer@example.com',
+        email: payerEmail,
         identification: payer?.cpf ? {
           type: 'CPF',
           number: payer.cpf.replace(/\D/g, ''),
@@ -77,9 +88,9 @@ export async function POST(request: NextRequest) {
       paymentData.token = cardToken;
       paymentData.installments = 1;
       
-      // NOTA: Não enviamos payment_method_id quando usamos token
+      // Adiciona campos específicos para pagamento com cartão
       // O MercadoPago detecta automaticamente a bandeira pelo token
-      // Se enviarmos ambos, pode causar conflito
+      // Não enviamos payment_method_id para evitar conflito
     }
 
     // Cria o pagamento no Mercado Pago
@@ -89,35 +100,90 @@ export async function POST(request: NextRequest) {
     
     let result;
     try {
+      console.log('Sending payment to MercadoPago:', JSON.stringify({
+        transaction_amount: paymentData.transaction_amount,
+        currency_id: paymentData.currency_id,
+        description: paymentData.description,
+        payment_method: paymentMethod,
+        has_token: !!paymentData.token,
+        payer_email: paymentData.payer.email,
+        has_identification: !!paymentData.payer.identification,
+      }, null, 2));
+
       result = await payment.create({ body: paymentData });
-      console.log('Payment created successfully:', result.id, result.status);
+      console.log('Payment created successfully:', result.id, result.status, result.status_detail);
     } catch (paymentError: unknown) {
       console.error('Payment creation error:', paymentError);
       
       // Captura detalhes do erro do MercadoPago
       let errorDetails = 'Unknown error';
+      let errorMessage = 'Erro ao processar pagamento no Mercado Pago';
+      let statusCode = 500;
+
       if (paymentError && typeof paymentError === 'object') {
+        // Tenta extrair mensagem de erro
         if ('message' in paymentError) {
           errorDetails = String(paymentError.message);
+          errorMessage = errorDetails;
         }
+        
+        // Tenta extrair causa do erro
         if ('cause' in paymentError && paymentError.cause) {
           console.error('Payment error cause:', paymentError.cause);
+          if (typeof paymentError.cause === 'object' && 'message' in paymentError.cause) {
+            errorDetails = String(paymentError.cause.message);
+          }
         }
-        // Se for um erro do MercadoPago SDK, pode ter mais informações
-        if ('status' in paymentError) {
-          console.error('Payment error status:', paymentError.status);
+        
+        // Tenta extrair resposta completa do erro
+        if ('response' in paymentError && paymentError.response) {
+          const response = paymentError.response as Record<string, unknown>;
+          console.error('Payment error response:', JSON.stringify(response, null, 2));
+          
+          // MercadoPago retorna erros em formato específico
+          if ('body' in response && response.body) {
+            const body = response.body as Record<string, unknown>;
+            if ('message' in body) {
+              errorMessage = String(body.message);
+            }
+            if ('cause' in body && Array.isArray(body.cause)) {
+              const causes = body.cause as Array<Record<string, unknown>>;
+              if (causes.length > 0 && 'description' in causes[0]) {
+                errorDetails = String(causes[0].description);
+                errorMessage = errorDetails;
+              }
+            }
+            if ('error' in body && typeof body.error === 'string') {
+              errorMessage = body.error;
+            }
+          }
+          
+          // Status HTTP do erro
+          if ('status' in response && typeof response.status === 'number') {
+            statusCode = response.status;
+          }
         }
-        if ('response' in paymentError) {
-          console.error('Payment error response:', paymentError.response);
+        
+        // Status do erro
+        if ('status' in paymentError && typeof paymentError.status === 'number') {
+          statusCode = paymentError.status;
+          console.error('Payment error status:', statusCode);
         }
       }
       
+      console.error('Final error message:', errorMessage);
+      console.error('Final error details:', errorDetails);
+      
       return NextResponse.json(
         { 
-          error: 'Erro ao processar pagamento no Mercado Pago',
-          details: errorDetails 
+          error: errorMessage,
+          details: errorDetails,
+          // Mostra detalhes completos apenas em desenvolvimento
+          ...(process.env.NODE_ENV === 'development' && { 
+            fullError: paymentError 
+          })
         },
-        { status: 500 }
+        { status: statusCode }
       );
     }
 
