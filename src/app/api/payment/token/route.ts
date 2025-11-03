@@ -15,20 +15,24 @@ export async function POST(request: NextRequest) {
 
     // Cria o token do cartão no Mercado Pago
     const cardToken = createCardTokenClient();
+    const tokenBody: Record<string, unknown> = {
+      card_number: cardNumber.replace(/\s/g, ''),
+      cardholder_name: cardholderName,
+      card_expiration_month: cardExpirationMonth,
+      card_expiration_year: cardExpirationYear,
+      security_code: securityCode,
+    };
+
+    // Adiciona dados de identificação se fornecidos
+    if (identificationNumber) {
+      tokenBody.cardholder_identification = {
+        type: identificationType || 'CPF',
+        number: identificationNumber.replace(/\D/g, ''),
+      };
+    }
+
     const result = await cardToken.create({
-      body: {
-        card_number: cardNumber.replace(/\s/g, ''),
-        cardholder: {
-          name: cardholderName,
-          identification: {
-            type: identificationType || 'CPF',
-            number: identificationNumber?.replace(/\D/g, '') || '',
-          },
-        },
-        card_expiration_month: cardExpirationMonth,
-        card_expiration_year: cardExpirationYear,
-        security_code: securityCode,
-      },
+      body: tokenBody as Parameters<typeof cardToken.create>[0]['body'],
     });
 
     return NextResponse.json({
