@@ -1,3 +1,5 @@
 {
-  "imports": {}
+  "imports": {
+    "mqtt": "https://deno.land/x/mqtt@v0.0.1/deno/mod.ts"
+  }
 }
