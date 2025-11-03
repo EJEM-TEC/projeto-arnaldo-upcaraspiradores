@@ -6,7 +6,7 @@ import DashboardLayout from './DashboardLayout';
 import { obterClientePorId } from '@/lib/clientes';
 import MudarSenhaForm from './mudar-senha';
 import { AddMachineForm } from './AddMachineForm';
-import { getAllMachines, Machine, getAllActivationHistory, ActivationHistory, createTransaction, getBillingData } from '@/lib/database';
+import { getAllMachines, Machine, getAllActivationHistory, ActivationHistory, createTransaction, getBillingData, Transaction } from '@/lib/database';
 
 type DashboardView = 'adicionar_credito' | 'faturamento' | 'historico_acionamentos' | 'equipamentos' | 'alterar_senha' | 'adicionar_maquina';
 
@@ -77,10 +77,10 @@ export default function Dashboard() {
     const fetchBillingData = async () => {
       if (currentView === 'faturamento') {
         setLoadingBilling(true);
-        
+
         const now = new Date();
         let startDate: Date;
-        let endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
         switch (billingPeriod) {
           case 'today':
@@ -102,13 +102,13 @@ export default function Dashboard() {
         }
 
         const { data, error } = await getBillingData(startDate.toISOString(), endDate.toISOString());
-        
+
         if (error) {
           console.error('Erro ao buscar dados de faturamento:', error);
         } else {
           setBillingData(data);
         }
-        
+
         setLoadingBilling(false);
       }
     };
@@ -145,7 +145,7 @@ export default function Dashboard() {
       case 'adicionar_credito':
         const handleAddCredit = async (e: React.FormEvent) => {
           e.preventDefault();
-          
+
           if (!clientId.trim() || !amount.trim() || !paymentMethod) {
             alert('Por favor, preencha todos os campos obrigatórios.');
             return;
@@ -173,7 +173,7 @@ export default function Dashboard() {
               }
             }
 
-            const description = clientName 
+            const description = clientName
               ? `Crédito adicionado para ${clientName}`
               : `Crédito adicionado - Cliente ID: ${clientId}`;
 
@@ -194,7 +194,7 @@ export default function Dashboard() {
               setClientName('');
               setAmount('');
               setPaymentMethod('');
-              
+
               // Recarregar histórico de caixa se estiver visível
               // Isso será feito automaticamente pelo useEffect quando currentView mudar
             }
@@ -336,11 +336,10 @@ export default function Dashboard() {
                     <p className="text-red-100 text-sm">{periodLabels[billingPeriod]}</p>
                   </div>
 
-                  <div className={`bg-gradient-to-r p-6 rounded-lg text-white ${
-                    billingData.netProfit >= 0 
-                      ? 'from-blue-500 to-blue-600' 
-                      : 'from-orange-500 to-orange-600'
-                  }`}>
+                  <div className={`bg-gradient-to-r p-6 rounded-lg text-white ${billingData.netProfit >= 0
+                    ? 'from-blue-500 to-blue-600'
+                    : 'from-orange-500 to-orange-600'
+                    }`}>
                     <h3 className="text-lg font-semibold mb-2">Lucro Líquido</h3>
                     <p className="text-3xl font-bold">
                       R$ {billingData.netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -462,14 +461,14 @@ export default function Dashboard() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {activationHistory.map((activation) => {
                         // Formatar data/hora
-                        const startDate = activation.started_at 
+                        const startDate = activation.started_at
                           ? new Date(activation.started_at).toLocaleString('pt-BR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
                           : '-';
 
                         // Calcular duração
@@ -493,21 +492,21 @@ export default function Dashboard() {
                         // Status e cor
                         const status = activation.status || 'em_andamento';
                         const statusText = status === 'concluído' || status === 'concluido' ? 'Concluído' :
-                                          status === 'em_andamento' ? 'Em Andamento' :
-                                          status;
-                        const statusClass = status === 'concluído' || status === 'concluido' ? 
-                                          'bg-green-100 text-green-800' : 
-                                          'bg-yellow-100 text-yellow-800';
+                          status === 'em_andamento' ? 'Em Andamento' :
+                            status;
+                        const statusClass = status === 'concluído' || status === 'concluido' ?
+                          'bg-green-100 text-green-800' :
+                          'bg-yellow-100 text-yellow-800';
 
                         // Nome do equipamento
-                        const machineName = (activation as any).machines?.location 
+                        const machineName = (activation as any).machines?.location
                           ? `Aspirador #${activation.machine_id} - ${(activation as any).machines.location}`
                           : `Aspirador #${activation.machine_id}`;
 
                         // Comando
-                        const commandText = activation.command === 'on' ? 'Ligado' : 
-                                           activation.command === 'off' ? 'Desligado' : 
-                                           activation.command;
+                        const commandText = activation.command === 'on' ? 'Ligado' :
+                          activation.command === 'off' ? 'Desligado' :
+                            activation.command;
 
                         // Temperatura média
                         const avgTemp = activation.average_temperature !== null && activation.average_temperature !== undefined
@@ -601,17 +600,17 @@ export default function Dashboard() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {machines.map((machine) => {
                         const status = machine.status || 'ativo';
-                        const statusText = status === 'ativo' || status === 'active' ? 'Ativo' : 
-                                          status === 'manutenção' || status === 'maintenance' ? 'Manutenção' : 
-                                          status;
-                        const statusClass = status === 'ativo' || status === 'active' ? 
-                                          'bg-green-100 text-green-800' : 
-                                          status === 'manutenção' || status === 'maintenance' ? 
-                                          'bg-red-100 text-red-800' : 
-                                          'bg-gray-100 text-gray-800';
-                        
-                        const createdAt = machine.created_at ? 
-                          new Date(machine.created_at).toLocaleDateString('pt-BR') : 
+                        const statusText = status === 'ativo' || status === 'active' ? 'Ativo' :
+                          status === 'manutenção' || status === 'maintenance' ? 'Manutenção' :
+                            status;
+                        const statusClass = status === 'ativo' || status === 'active' ?
+                          'bg-green-100 text-green-800' :
+                          status === 'manutenção' || status === 'maintenance' ?
+                            'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800';
+
+                        const createdAt = machine.created_at ?
+                          new Date(machine.created_at).toLocaleDateString('pt-BR') :
                           '-';
 
                         return (

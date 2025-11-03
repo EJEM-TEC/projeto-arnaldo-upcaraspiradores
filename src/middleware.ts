@@ -74,25 +74,28 @@ export async function middleware(req: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  // Se não tem role na tabela, verifica se é admin pelo email
-  let userRole = profile?.role
+  // arnaldfirst@gmail.com é sempre admin (prioridade sobre role na tabela)
+  let userRole = user.email === 'arnaldfirst@gmail.com' ? 'admin' : profile?.role
   if (!userRole) {
-    // Verifica se o email é de admin (você pode ajustar esta lógica)
-    userRole = user.email === 'arnaldfirst@gmail.com' ? 'admin' : 'cliente'
+    userRole = 'cliente'
   }
 
-  // Se o usuário logado tenta acessar a página de login, redireciona para seu painel
-  if (req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/login-usuario') {
+  // Se o usuário logado tenta acessar a página de login-usuario, redireciona para seu painel
+  // Mas permite acesso ao /login mesmo estando logado (para permitir logout/login de outro usuário)
+  if (req.nextUrl.pathname === '/login-usuario') {
     return NextResponse.redirect(new URL(userRole === 'admin' ? '/painel_de_controle' : '/home', req.url))
   }
 
+  // arnaldfirst@gmail.com pode acessar todas as páginas
+  const isSuperAdmin = user.email === 'arnaldfirst@gmail.com'
+  
   // Se um 'cliente' tenta acessar uma página de 'admin'
   if (req.nextUrl.pathname.startsWith('/painel_de_controle') && userRole !== 'admin') {
     return NextResponse.redirect(new URL('/home', req.url))
   }
 
-  // Se um 'admin' tenta acessar uma página de 'cliente'
-  if (req.nextUrl.pathname.startsWith('/cliente') && userRole !== 'cliente') {
+  // Se um 'admin' tenta acessar uma página de 'cliente' (exceto arnaldfirst@gmail.com que pode acessar tudo)
+  if (req.nextUrl.pathname.startsWith('/cliente') && userRole !== 'cliente' && !isSuperAdmin) {
     return NextResponse.redirect(new URL('/painel_de_controle', req.url))
   }
 

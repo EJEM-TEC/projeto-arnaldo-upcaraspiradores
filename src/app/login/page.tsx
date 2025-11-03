@@ -18,8 +18,35 @@ export default function LoginPage() {
     const checkSession = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Se já estiver logado, o middleware cuidará do redirecionamento
-        router.refresh();
+        // Se já estiver logado, verifica a role e redireciona
+        try {
+          const { data: profile } = await supabase
+            .from('usuarios')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+          // arnaldfirst@gmail.com é sempre admin
+          let role = user.email === 'arnaldfirst@gmail.com' ? 'admin' : profile?.role;
+          if (!role) {
+            role = 'cliente';
+          }
+
+          if (role === 'admin') {
+            router.push('/painel_de_controle');
+          } else {
+            router.push('/home');
+          }
+        } catch {
+          // Em caso de erro, verifica pelo email como fallback
+          // arnaldfirst@gmail.com é sempre admin
+          const role = user.email === 'arnaldfirst@gmail.com' ? 'admin' : 'cliente';
+          if (role === 'admin') {
+            router.push('/painel_de_controle');
+          } else {
+            router.push('/home');
+          }
+        }
       } else {
         setLoading(false);
       }
@@ -33,7 +60,7 @@ export default function LoginPage() {
     setLoading(true);
 
     // Lógica de login com Supabase
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error, data } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -42,8 +69,37 @@ export default function LoginPage() {
       setError('Credenciais inválidas. Verifique seu e-mail e senha.');
       setLoading(false);
     } else {
-      // O middleware cuidará do redirecionamento após o login
-      router.refresh();
+      // Após login bem-sucedido, verifica a role e redireciona
+      if (data.user) {
+        try {
+          const { data: profile } = await supabase
+            .from('usuarios')
+            .select('role')
+            .eq('id', data.user.id)
+            .single();
+
+          // arnaldfirst@gmail.com é sempre admin
+          let role = data.user.email === 'arnaldfirst@gmail.com' ? 'admin' : profile?.role;
+          if (!role) {
+            role = 'cliente';
+          }
+
+          if (role === 'admin') {
+            router.push('/painel_de_controle');
+          } else {
+            router.push('/home');
+          }
+        } catch {
+          // Em caso de erro, verifica pelo email como fallback
+          // arnaldfirst@gmail.com é sempre admin
+          const role = data.user.email === 'arnaldfirst@gmail.com' ? 'admin' : 'cliente';
+          if (role === 'admin') {
+            router.push('/painel_de_controle');
+          } else {
+            router.push('/home');
+          }
+        }
+      }
     }
   };
 

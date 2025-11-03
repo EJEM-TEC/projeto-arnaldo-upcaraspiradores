@@ -30,27 +30,27 @@ export default function DashboardPage() {
           .eq('id', user.id)
           .single();
 
-        let role = profile?.role;
-        
-        // Se não tem role na tabela, verifica se é admin pelo email
+        // arnaldfirst@gmail.com é sempre admin (prioridade sobre role na tabela)
+        let role = user.email === 'arnaldfirst@gmail.com' ? 'admin' : profile?.role;
         if (!role) {
-          role = user.email === 'teste@email.com.br' ? 'admin' : 'cliente';
+          role = 'cliente';
         }
 
         setUserRole(role);
 
         // Se o usuário não é admin, redireciona para home
         if (role !== 'admin') {
-          //router.push('/home');
+          router.push('/home');
           return;
         }
       } catch (error) {
         console.error('Erro ao verificar role:', error);
         // Em caso de erro, verifica pelo email como fallback
-        const role = user.email === 'teste@email.com.br' ? 'admin' : 'cliente';
+        // arnaldfirst@gmail.com é sempre admin
+        const role = user.email === 'arnaldfirst@gmail.com' ? 'admin' : 'cliente';
         setUserRole(role);
         if (role !== 'admin') {
-          //router.push('/home');
+          router.push('/home');
           return;
         }
       } finally {
@@ -73,7 +73,14 @@ export default function DashboardPage() {
   }
 
   if (!user || userRole !== 'admin') {
-    return null; // Will redirect in useEffect
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Redirecionando...</p>
+        </div>
+      </div>
+    );
   }
 
   return <Dashboard />;
