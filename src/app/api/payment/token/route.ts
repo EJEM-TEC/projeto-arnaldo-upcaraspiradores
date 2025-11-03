@@ -143,24 +143,13 @@ export async function POST(request: NextRequest) {
     console.log(JSON.stringify(tokenBody, null, 2));
     console.log('==========================');
 
-    // Prepara o body final antes do try para que possa ser usado no catch
-    // IMPORTANTE: O Mercado Pago espera card_expiration_month como NÚMERO INTEIRO (1-12)
-    // NÃO como string! Vamos garantir que seja realmente um número
-    const expirationMonthAsInt: number = monthNum; // Número inteiro 1-12 (garantido)
-    
-    // Valida que realmente é um número
-    if (typeof expirationMonthAsInt !== 'number' || isNaN(expirationMonthAsInt)) {
-      console.error('ERROR: expirationMonthAsInt is not a number:', expirationMonthAsInt);
-      return NextResponse.json(
-        { error: 'Erro interno: mês de expiração inválido' },
-        { status: 500 }
-      );
-    }
-    
+    // Prepara o body final - TRATANDO EXATAMENTE COMO OS OUTROS CAMPOS (todos como string)
+    // O Mercado Pago recebe todos os campos como string, incluindo expiration_month
+    // Vamos usar o mesmo padrão que card_number, card_expiration_year, etc.
     const finalBody: {
       card_number: string;
       cardholder_name: string;
-      card_expiration_month: number; // OBRIGATÓRIO: Número inteiro 1-12
+      card_expiration_month: string; // STRING como os outros campos!
       card_expiration_year: string;
       security_code: string;
       cardholder_identification?: {
@@ -168,12 +157,11 @@ export async function POST(request: NextRequest) {
         number: string;
       };
     } = {
-      card_number: tokenBody.card_number,
-      cardholder_name: tokenBody.cardholder_name,
-      // ENVIANDO COMO NÚMERO INTEIRO (não string!)
-      card_expiration_month: expirationMonthAsInt, // Número inteiro 1-12
-      card_expiration_year: tokenBody.card_expiration_year,
-      security_code: tokenBody.security_code,
+      card_number: tokenBody.card_number, // STRING
+      cardholder_name: tokenBody.cardholder_name, // STRING
+      card_expiration_month: tokenBody.card_expiration_month, // STRING (mesmo padrão dos outros)
+      card_expiration_year: tokenBody.card_expiration_year, // STRING
+      security_code: tokenBody.security_code, // STRING
     };
     
     // Adiciona identificação se presente
@@ -196,14 +184,22 @@ export async function POST(request: NextRequest) {
       
       console.log('Final body que será enviado:');
       console.log(JSON.stringify(finalBody, null, 2));
-      console.log('=== VERIFICAÇÃO DE TIPOS ===');
+      console.log('=== VERIFICAÇÃO DE TIPOS (todos devem ser STRING) ===');
+      console.log('card_number tipo:', typeof finalBody.card_number);
+      console.log('cardholder_name tipo:', typeof finalBody.cardholder_name);
       console.log('card_expiration_month valor:', finalBody.card_expiration_month);
       console.log('card_expiration_month tipo:', typeof finalBody.card_expiration_month);
-      console.log('card_expiration_month é número?', typeof finalBody.card_expiration_month === 'number');
       console.log('card_expiration_month é string?', typeof finalBody.card_expiration_month === 'string');
-      console.log('monthNum original:', monthNum, '(tipo:', typeof monthNum, ')');
-      console.log('expirationMonthAsInt:', expirationMonthAsInt, '(tipo:', typeof expirationMonthAsInt, ')');
-      console.log('============================');
+      console.log('card_expiration_year tipo:', typeof finalBody.card_expiration_year);
+      console.log('security_code tipo:', typeof finalBody.security_code);
+      console.log('Todos os campos são string?', 
+        typeof finalBody.card_number === 'string' &&
+        typeof finalBody.cardholder_name === 'string' &&
+        typeof finalBody.card_expiration_month === 'string' &&
+        typeof finalBody.card_expiration_year === 'string' &&
+        typeof finalBody.security_code === 'string'
+      );
+      console.log('====================================================');
       
       result = await cardToken.create({
         body: finalBody as Parameters<typeof cardToken.create>[0]['body'],
