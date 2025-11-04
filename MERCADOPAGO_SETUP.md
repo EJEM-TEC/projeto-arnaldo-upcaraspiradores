@@ -26,17 +26,20 @@ Adicione no arquivo `.env.local`:
 ```env
 # MercadoPago
 MERCADOPAGO_ACCESS_TOKEN=seu_access_token_aqui
+NEXT_PUBLIC_MP_PUBLIC_KEY=sua_chave_publica_aqui
 
 # URL da aplicação (para webhooks)
 NEXT_PUBLIC_APP_URL=https://seu-dominio.com
 # OU use automaticamente VERCEL_URL em produção
 ```
 
-### 2. Obter Access Token do MercadoPago
+### 2. Obter Credenciais do MercadoPago
 
 1. Acesse: https://www.mercadopago.com.br/developers/panel
 2. Vá em **Suas integrações** > **Credenciais**
-3. Copie o **Access Token** (produção ou teste)
+3. Copie:
+   - **Access Token** (produção ou teste) → `MERCADOPAGO_ACCESS_TOKEN`
+   - **Chave Pública** (Public Key) → `NEXT_PUBLIC_MP_PUBLIC_KEY`
 4. Cole no `.env.local`
 
 ### 3. Configurar Webhooks

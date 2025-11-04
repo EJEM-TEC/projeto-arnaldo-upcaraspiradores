@@ -62,6 +62,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon-aqui
 #### Variáveis do Mercado Pago:
 ```
 MERCADOPAGO_ACCESS_TOKEN=seu-access-token-do-mercado-pago
+NEXT_PUBLIC_MP_PUBLIC_KEY=sua-chave-publica-do-mercado-pago
 ```
 
 #### Variável da URL do App (para webhooks):
@@ -81,12 +82,14 @@ NEXT_PUBLIC_APP_URL=https://seu-projeto.vercel.app
 2. Faça login na sua conta
 3. Vá em **"Seu negócio"** > **"Configurações"** > **"Credenciais"**
 
-### 3.2. Obter Access Token
+### 3.2. Obter Credenciais
 
 - **Produção**: Use as credenciais de **Produção**
 - **Testes**: Use as credenciais de **Teste** (recomendado para começar)
 
-Copie o **Access Token** e adicione como variável de ambiente na Vercel.
+Copie as seguintes credenciais e adicione como variáveis de ambiente na Vercel:
+- **Access Token** → `MERCADOPAGO_ACCESS_TOKEN`
+- **Chave Pública** (Public Key) → `NEXT_PUBLIC_MP_PUBLIC_KEY`
 
 ### 3.3. Configurar Webhook (Opcional mas Recomendado)
 
