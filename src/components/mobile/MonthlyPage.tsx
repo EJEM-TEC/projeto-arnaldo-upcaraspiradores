@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { type CardData } from './CreditCardPage';
 
 interface MonthlyPageProps {
-    onNext: (data: { amount: string; cardData: CardData }) => void;
+    onNext: (data: { amount: string; cardData?: CardData }) => void;
 }
 
 export default function MonthlyPage({ onNext }: MonthlyPageProps) {

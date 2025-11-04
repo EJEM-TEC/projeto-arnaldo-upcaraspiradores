@@ -27,9 +27,9 @@ export default function MobileDashboard() {
     const [user, setUser] = useState<User | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [paymentData, setPaymentData] = useState<{ 
-        amount: string; 
-        cpf?: string; 
+    const [paymentData, setPaymentData] = useState<{
+        amount: string;
+        cpf?: string;
         cardData?: CardData;
         pixCode?: string;
         qrCode?: string;
@@ -40,7 +40,7 @@ export default function MobileDashboard() {
         const checkAuth = async () => {
             // Primeiro tenta obter a sessão
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            
+
             if (sessionError) {
                 console.error('Error getting session:', sessionError);
                 router.push('/login-usuario');
@@ -50,12 +50,12 @@ export default function MobileDashboard() {
             if (!session || !session.user) {
                 // Se não há sessão, tenta obter o usuário diretamente
                 const { data: { user }, error: userError } = await supabase.auth.getUser();
-                
+
                 if (!user || userError) {
                     router.push('/login-usuario');
                     return;
                 }
-                
+
                 setUser(user);
                 setLoading(false);
             } else {
@@ -63,7 +63,7 @@ export default function MobileDashboard() {
                 setLoading(false);
             }
         };
-        
+
         checkAuth();
 
         // Listener para mudanças de autenticação
@@ -98,7 +98,7 @@ export default function MobileDashboard() {
         setCurrentView('pix-code');
     };
 
-    const handlePaymentNext = (data: { amount: string; cardData: CardData }) => {
+    const handlePaymentNext = (data: { amount: string; cardData?: CardData }) => {
         setPaymentData(data);
         setCurrentView('timer');
     };
