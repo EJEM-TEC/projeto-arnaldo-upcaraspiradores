@@ -4,13 +4,13 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface CardData {
-  token?: string;
-  cardNumber?: string;
-  cvv?: string;
-  cardholderName: string;
-  month?: string;
-  year?: string;
-  cpf: string;
+    token?: string;
+    cardNumber?: string;
+    cvv?: string;
+    cardholderName: string;
+    month?: number;
+    year?: number;
+    cpf: string;
 }
 
 interface CreditCardPageProps {
@@ -22,8 +22,8 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
     const [cardNumber, setCardNumber] = useState('');
     const [cvv, setCvv] = useState('');
     const [cardholderName, setCardholderName] = useState('');
-    const [month, setMonth] = useState('');
-    const [year, setYear] = useState('');
+    const [month, setMonth] = useState(0);
+    const [year, setYear] = useState(0);
     const [cpf, setCpf] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -31,31 +31,25 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
     const amounts = ['5', '10', '20', '30', '40', '50'];
 
     const handlePay = async () => {
-        if (!cardNumber || !cvv || !cardholderName || !month || !year || !cpf) {
+        if (!cardNumber || !cvv || !cardholderName || month === 0 || year === 0 || !cpf) {
             setError('Por favor, preencha todos os campos');
             return;
         }
 
         // Valida e limpa o mês
-        const cleanedMonth = month.replace(/\D/g, '').trim();
-        if (!cleanedMonth || cleanedMonth === '' || parseInt(cleanedMonth, 10) < 1 || parseInt(cleanedMonth, 10) > 12) {
+        if (month < 1 || month > 12) {
             setError('Mês de expiração inválido (digite um número entre 1 e 12)');
             return;
         }
-
-        // Valida e limpa o ano
-        const cleanedYear = year.replace(/\D/g, '').trim();
-        if (!cleanedYear || cleanedYear === '') {
-            setError('Ano de expiração inválido');
+        if (year < 2025 || year > 2030) {
+            setError('Ano de expiração inválido (digite um ano entre 2025 e 2030)');
             return;
         }
 
         // Log para debug
         console.log('Frontend - Sending token request:', {
-            month: cleanedMonth,
-            year: cleanedYear,
-            monthType: typeof cleanedMonth,
-            yearType: typeof cleanedYear,
+            month: month,
+            year: year,
         });
 
         setLoading(true);
@@ -66,8 +60,8 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
             const tokenRequestBody = {
                 cardNumber: cardNumber.replace(/\s/g, ''),
                 cardholderName,
-                cardExpirationMonth: cleanedMonth,
-                cardExpirationYear: cleanedYear,
+                cardExpirationMonth: month,
+                cardExpirationYear: year,
                 securityCode: cvv,
                 identificationType: 'CPF',
                 identificationNumber: cpf.replace(/\D/g, ''),
@@ -165,8 +159,8 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                             key={amount}
                             onClick={() => setSelectedAmount(amount)}
                             className={`w-full h-16 rounded-full font-bold text-lg transition-colors ${selectedAmount === amount
-                                    ? 'bg-orange-500 text-white'
-                                    : 'bg-white text-black hover:bg-gray-200'
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-white text-black hover:bg-gray-200'
                                 }`}
                         >
                             R$ {amount}
@@ -211,13 +205,13 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                         onChange={(e) => {
                             const value = e.target.value.replace(/\D/g, '');
                             if (value === '' || (parseInt(value, 10) >= 1 && parseInt(value, 10) <= 12)) {
-                                setMonth(value);
+                                setMonth(parseInt(value, 10));
                             }
                         }}
                         onBlur={(e) => {
                             const value = e.target.value.replace(/\D/g, '').trim();
                             if (value && parseInt(value, 10) >= 1 && parseInt(value, 10) <= 12) {
-                                setMonth(String(parseInt(value, 10)).padStart(2, '0'));
+                                setMonth(parseInt(value, 10));
                             }
                         }}
                         placeholder="MÊS (01-12)"
@@ -229,8 +223,8 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                         value={year}
                         onChange={(e) => {
                             const value = e.target.value.replace(/\D/g, '');
-                            if (value.length <= 4) {
-                                setYear(value);
+                            if (value.length <= 4 && parseInt(value, 10) >= 2025 && parseInt(value, 10) <= 2030) {
+                                setYear(parseInt(value, 10));
                             }
                         }}
                         placeholder="ANO (AAAA)"
