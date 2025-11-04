@@ -1,30 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPaymentClient } from '@/lib/mercadopago';
+import { Payment, MercadoPagoConfig } from 'mercadopago';
 import { createTransaction } from '@/lib/database';
 import { detectCardBrand } from '@/lib/cardUtils';
+import { randomUUID } from 'crypto';
 
-interface PaymentData {
+// Interface seguindo exatamente a documentação do Mercado Pago
+interface PaymentBody {
   transaction_amount: number;
+  token?: string; // Opcional porque PIX não usa token
   description: string;
-  payment_method_id?: string;
+  installments: number;
+  payment_method_id: string;
+  issuer_id?: number; // Deve ser number, não string
   payer: {
     email: string;
-    identification?: {
+    identification: {
       type: string;
       number: string;
     };
   };
-  external_reference: string;
-  notification_url: string;
-  token?: string;
-  installments?: number;
-  statement_descriptor?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { amount, paymentMethod, userId, description, payer, cardToken } = body;
+    const { amount, paymentMethod, userId, description, payer, cardToken, cardNumber, issuerId } = body;
 
     if (!amount || !paymentMethod) {
       return NextResponse.json(
@@ -41,12 +41,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-      'https://projeto-arnaldo-upcaraspiradores.vercel.app';
-
     // Valida email do pagador
-    const payerEmail = payer?.email || 'payer@example.com';
+    const payerEmail = payer?.email;
     if (!payerEmail || !payerEmail.includes('@')) {
       return NextResponse.json(
         { error: 'Email inválido do pagador' },
@@ -54,63 +50,116 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Monta os dados do pagamento baseado no método
-    // NOTA: O SDK do Mercado Pago define a moeda automaticamente baseado no Access Token
-    // Não é necessário enviar currency_id
-    const paymentData: PaymentData = {
-      transaction_amount: amountValue,
-      description: description || `Crédito adicionado - ${paymentMethod}`,
-      statement_descriptor: 'UpCar Aspiradores',
-      payer: {
-        email: payerEmail,
-        identification: payer?.cpf ? {
-          type: 'CPF',
-          number: payer.cpf.replace(/\D/g, ''),
-        } : undefined,
-      },
-      external_reference: `USER_${userId || 'guest'}_${Date.now()}`,
-      notification_url: `${baseUrl}/api/payment/webhook`,
-    };
-
-    // Para PIX
-    if (paymentMethod === 'pix') {
-      paymentData.payment_method_id = 'pix';
+    // Valida identificação do pagador
+    if (!payer?.cpf) {
+      return NextResponse.json(
+        { error: 'CPF do pagador é obrigatório' },
+        { status: 400 }
+      );
     }
 
-    // Para cartão de crédito
-    if (paymentMethod === 'credit-card') {
+    // Cria cliente do Mercado Pago seguindo exatamente a documentação
+    const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: 'MERCADOPAGO_ACCESS_TOKEN não configurado' },
+        { status: 500 }
+      );
+    }
+
+    const client = new MercadoPagoConfig({ accessToken });
+    const payment = new Payment(client);
+
+    // Gera idempotency key única para evitar duplicação
+    const idempotencyKey = randomUUID();
+
+    let paymentBody: PaymentBody;
+
+    // Para PIX - não usa token, apenas payment_method_id
+    if (paymentMethod === 'pix') {
+      paymentBody = {
+        transaction_amount: amountValue,
+        description: description || `Crédito adicionado via PIX - R$ ${amountValue}`,
+        installments: 1,
+        payment_method_id: 'pix',
+        payer: {
+          email: payerEmail,
+          identification: {
+            type: 'CPF',
+            number: payer.cpf.replace(/\D/g, ''),
+          },
+        },
+      };
+    } 
+    // Para cartão de crédito - seguindo exatamente a documentação
+    else if (paymentMethod === 'credit-card') {
       if (!cardToken) {
         return NextResponse.json(
           { error: 'Card token is required for credit card payments' },
           { status: 400 }
         );
       }
-      paymentData.token = cardToken;
-      paymentData.installments = 1;
+
+      // Detecta a bandeira do cartão para definir payment_method_id
+      const cardBrand = detectCardBrand(cardNumber?.replace(/\s/g, '') || '');
+      let paymentMethodId = 'visa'; // padrão
       
-      // Adiciona campos específicos para pagamento com cartão
-      // O MercadoPago detecta automaticamente a bandeira pelo token
-      // Não enviamos payment_method_id para evitar conflito
+      if (cardBrand === 'mastercard' || cardBrand === 'master') {
+        paymentMethodId = 'master';
+      } else if (cardBrand === 'elo') {
+        paymentMethodId = 'elo';
+      } else if (cardBrand === 'amex' || cardBrand === 'american_express') {
+        paymentMethodId = 'amex';
+      }
+
+      // Converte issuer_id para number se presente
+      let issuerIdNumber: number | undefined = undefined;
+      if (issuerId) {
+        const parsed = parseInt(String(issuerId), 10);
+        if (!isNaN(parsed)) {
+          issuerIdNumber = parsed;
+        }
+      }
+
+      paymentBody = {
+        transaction_amount: amountValue,
+        token: cardToken,
+        description: description || `Crédito adicionado via Cartão - R$ ${amountValue}`,
+        installments: 1,
+        payment_method_id: paymentMethodId,
+        issuer_id: issuerIdNumber, // Deve ser number ou undefined
+        payer: {
+          email: payerEmail,
+          identification: {
+            type: 'CPF',
+            number: payer.cpf.replace(/\D/g, ''),
+          },
+        },
+      };
+    } else {
+      return NextResponse.json(
+        { error: 'Método de pagamento não suportado' },
+        { status: 400 }
+      );
     }
 
-    // Cria o pagamento no Mercado Pago
-    const payment = createPaymentClient();
-    
-    console.log('Creating payment with data:', JSON.stringify(paymentData, null, 2));
+    console.log('Creating payment with data (following MercadoPago docs):');
+    console.log(JSON.stringify(paymentBody, null, 2));
+    console.log('Idempotency Key:', idempotencyKey);
     
     let result;
     try {
-      console.log('Sending payment to MercadoPago:', JSON.stringify({
-        transaction_amount: paymentData.transaction_amount,
-        description: paymentData.description,
-        payment_method: paymentMethod,
-        has_token: !!paymentData.token,
-        payer_email: paymentData.payer.email,
-        has_identification: !!paymentData.payer.identification,
-      }, null, 2));
-
-      result = await payment.create({ body: paymentData });
-      console.log('Payment created successfully:', result.id, result.status, result.status_detail);
+      // Chama exatamente como na documentação
+      result = await payment.create({
+        body: paymentBody,
+        requestOptions: { idempotencyKey }
+      });
+      
+      console.log('✅ Payment created successfully:', {
+        id: result.id,
+        status: result.status,
+        status_detail: result.status_detail,
+      });
     } catch (paymentError: unknown) {
       console.error('Payment creation error:', paymentError);
       
@@ -186,52 +235,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Se o pagamento foi criado com sucesso, cria a transação no banco
-    if (result && result.id) {
-      try {
-        await createTransaction({
-          user_id: userId || null,
-          amount: amountValue,
-          type: 'entrada',
-          description: `Pagamento via ${paymentMethod} - ID: ${result.id} - Status: ${result.status}`,
-          payment_method: paymentMethod,
-        });
-      } catch (transactionError) {
-        console.error('Error creating transaction in database:', transactionError);
-        // Não falha o pagamento se apenas a transação no banco falhar
+      // Se o pagamento foi criado com sucesso, cria a transação no banco
+      if (result && result.id) {
+        try {
+          await createTransaction({
+            user_id: userId || null,
+            amount: amountValue,
+            type: 'entrada',
+            description: `Pagamento via ${paymentMethod} - ID: ${result.id} - Status: ${result.status}`,
+            payment_method: paymentMethod,
+          });
+        } catch (transactionError) {
+          console.error('Error creating transaction in database:', transactionError);
+          // Não falha o pagamento se apenas a transação no banco falhar
+        }
+
+        // Retorna dados específicos baseado no método de pagamento
+        const response: {
+          success: boolean;
+          paymentId: number | string;
+          status?: string;
+          pixCode?: string | null;
+          pixQrCode?: string | null;
+          ticketUrl?: string | null;
+        } = {
+          success: true,
+          paymentId: result.id,
+          status: result.status,
+        };
+
+        // Para PIX, retorna os dados do QR Code
+        if (paymentMethod === 'pix') {
+          const pointOfInteraction = result.point_of_interaction;
+          const transactionData = pointOfInteraction?.transaction_data;
+          
+          response.pixCode = transactionData?.qr_code || null;
+          response.pixQrCode = transactionData?.qr_code_base64 || null;
+          response.ticketUrl = transactionData?.ticket_url || null;
+        }
+
+        return NextResponse.json(response);
       }
 
-      // Retorna dados específicos baseado no método de pagamento
-      const response: {
-        success: boolean;
-        paymentId: number | string;
-        status?: string;
-        pixCode?: string | null;
-        pixQrCode?: string | null;
-        ticketUrl?: string | null;
-      } = {
-        success: true,
-        paymentId: result.id,
-        status: result.status,
-      };
-
-      // Para PIX, retorna os dados do QR Code
-      if (paymentMethod === 'pix') {
-        const pointOfInteraction = result.point_of_interaction;
-        const transactionData = pointOfInteraction?.transaction_data;
-        
-        response.pixCode = transactionData?.qr_code || null;
-        response.pixQrCode = transactionData?.qr_code_base64 || null;
-        response.ticketUrl = transactionData?.ticket_url || null;
-      }
-
-      return NextResponse.json(response);
-    }
-
-    return NextResponse.json(
-      { error: 'Failed to create payment - no payment ID returned' },
-      { status: 500 }
-    );
+      return NextResponse.json(
+        { error: 'Failed to create payment - no payment ID returned' },
+        { status: 500 }
+      );
   } catch (error) {
     console.error('Error creating payment:', error);
     

@@ -67,11 +67,11 @@ export default function Dashboard() {
       if (currentView === 'equipamentos' || currentView === 'adicionar_maquina') {
         setLoadingMachines(true);
         try {
-          const { data, error } = await getAllMachines();
+        const { data, error } = await getAllMachines();
           console.log('Resultado getAllMachines:', { data, error });
           
-          if (error) {
-            console.error('Erro ao buscar máquinas:', error);
+        if (error) {
+          console.error('Erro ao buscar máquinas:', error);
             const supabaseError = error as unknown as SupabaseError;
             console.error('Detalhes do erro:', {
               message: error.message,
@@ -81,15 +81,15 @@ export default function Dashboard() {
             });
             // Ainda assim, tenta definir como array vazio para não quebrar
             setMachines([]);
-          } else {
+        } else {
             console.log('Máquinas encontradas:', data);
-            setMachines(data || []);
-          }
+          setMachines(data || []);
+        }
         } catch (err) {
           console.error('Erro inesperado ao buscar máquinas:', err);
           setMachines([]);
         } finally {
-          setLoadingMachines(false);
+        setLoadingMachines(false);
         }
       }
     };
@@ -316,7 +316,7 @@ export default function Dashboard() {
             let userId: string | null = null;
             if (clientId.trim()) {
               // Usar o clientId como está (pode ser UUID ou ID numérico)
-              userId = clientId.trim();
+                userId = clientId.trim();
             }
 
             const description = clientName
@@ -790,15 +790,15 @@ export default function Dashboard() {
 
                         return (
                           <>
-                            <tr key={machine.id}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{machine.id}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{machine.location || 'Não especificada'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
-                                  {statusText}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{createdAt}</td>
+                          <tr key={machine.id}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{machine.id}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{machine.location || 'Não especificada'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
+                                {statusText}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{createdAt}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                                 <button onClick={() => toggleExpand(machine.id)} className="text-orange-600 hover:text-orange-800">
                                   {expandedMachines[machine.id] ? 'Fechar' : 'Detalhes'}
@@ -835,7 +835,7 @@ export default function Dashboard() {
                                     </div>
                                   </div>
                                 </td>
-                              </tr>
+                          </tr>
                             )}
                           </>
                         );
