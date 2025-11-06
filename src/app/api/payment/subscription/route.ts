@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMercadoPagoClient } from '@/lib/mercadopago';
 import { createTransaction } from '@/lib/database';
-import { detectCardBrand } from '@/lib/cardUtils';
 
 // Para assinaturas recorrentes, usaremos Preapproval do Mercado Pago
 // que permite cobranças automáticas mensais
@@ -9,7 +7,7 @@ import { detectCardBrand } from '@/lib/cardUtils';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { amount, userId, payer, cardToken, cardNumber, description } = body;
+    const { amount, userId, payer, cardToken, description } = body;
 
     if (!amount || !cardToken || !payer) {
       return NextResponse.json(
@@ -32,8 +30,6 @@ export async function POST(request: NextRequest) {
 
     // Cria um Preapproval (Assinatura Recorrente) no Mercado Pago
     // Isso permite cobranças automáticas mensais
-    const client = getMercadoPagoClient();
-    
     // Para criar assinatura, precisamos usar a API REST diretamente
     // pois o SDK pode não ter suporte completo
     const preapprovalData = {
