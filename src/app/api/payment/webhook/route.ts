@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { createTransaction } from '@/lib/database';
 
 // GET para verificação (Mercado Pago pode fazer GET para validar o endpoint)
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   console.log('Webhook GET request received');
   return NextResponse.json({ status: 'ok', message: 'Webhook endpoint is active' }, { status: 200 });
 }

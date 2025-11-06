@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
+import type { PreferenceRequest } from 'mercadopago/dist/clients/preference/commonTypes';
 import { createTransaction } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
@@ -60,37 +61,10 @@ export async function POST(request: NextRequest) {
     const externalReference = `USER_${userId || 'guest'}_${Date.now()}`;
 
     // Cria a preferência de pagamento (Checkout Pro)
-    const preferenceData: {
-      items: Array<{
-        title: string;
-        quantity: number;
-        unit_price: number;
-        currency_id: string;
-      }>;
-      payer: {
-        email: string;
-        identification: {
-          type: string;
-          number: string;
-        };
-      };
-      external_reference: string;
-      notification_url: string;
-      back_urls: {
-        success: string;
-        failure: string;
-        pending: string;
-      };
-      auto_return: string;
-      payment_methods: {
-        excluded_payment_methods: unknown[];
-        excluded_payment_types: unknown[];
-        installments: number;
-      };
-      statement_descriptor: string;
-    } = {
+    const preferenceData: PreferenceRequest = {
       items: [
         {
+          id: `item_${Date.now()}`,
           title: description || `Adicionar crédito - R$ ${amountValue}`,
           quantity: 1,
           unit_price: amountValue,

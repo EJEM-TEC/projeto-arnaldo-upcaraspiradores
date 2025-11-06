@@ -99,8 +99,8 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
                     cardNumber,
                     cvv,
                     cardholderName,
-                    month: month ? parseInt(month, 10) : undefined,
-                    year: year ? parseInt(year, 10) : undefined,
+                    month: month || undefined,
+                    year: year || undefined,
                     cpf
                 };
                 onNext({ amount: selectedAmount, cardData });
