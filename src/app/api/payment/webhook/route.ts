@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPaymentClient } from '@/lib/mercadopago';
 import { supabase } from '@/lib/supabaseClient';
+import { createTransaction } from '@/lib/database';
 
 // GET para verificação (Mercado Pago pode fazer GET para validar o endpoint)
 export async function GET(request: NextRequest) {
@@ -60,14 +61,17 @@ export async function POST(request: NextRequest) {
 
           // Atualiza a transação no banco de dados
           if (userId && userId !== 'guest') {
-            const paymentMethodId = paymentDetails.payment_method_id || 'unknown';
+            const paymentMethodId = paymentDetails.payment_method_id || 'checkout-pro';
+            const transactionAmount = paymentDetails.transaction_amount || 0;
             
-            // Busca a transação existente
+            // Busca a transação existente por external_reference ou payment ID
             const { data: existingTransaction } = await supabase
               .from('transactions')
-              .select('id')
+              .select('id, amount')
               .eq('user_id', userId)
-              .like('description', `%ID: ${paymentId}%`)
+              .or(`description.ilike.%Preference ID:%,description.ilike.%ID: ${paymentId}%`)
+              .order('created_at', { ascending: false })
+              .limit(1)
               .maybeSingle();
 
             if (existingTransaction) {
@@ -75,7 +79,8 @@ export async function POST(request: NextRequest) {
               const { error: updateError } = await supabase
                 .from('transactions')
                 .update({
-                  description: `Pagamento via ${paymentMethodId} - ID: ${paymentId} - Status: ${status}`,
+                  description: `Pagamento via ${paymentMethodId} - Payment ID: ${paymentId} - Status: ${status}`,
+                  amount: transactionAmount || existingTransaction.amount,
                 })
                 .eq('id', existingTransaction.id);
 
@@ -85,7 +90,19 @@ export async function POST(request: NextRequest) {
                 console.log(`Transaction updated for payment ${paymentId}`);
               }
             } else {
-              console.log(`No existing transaction found for payment ${paymentId}`);
+              // Cria uma nova transação se não existir (pode acontecer com checkout-pro)
+              try {
+                await createTransaction({
+                  user_id: userId,
+                  amount: transactionAmount,
+                  type: 'entrada',
+                  description: `Pagamento via ${paymentMethodId} - Payment ID: ${paymentId} - Status: ${status}`,
+                  payment_method: 'checkout-pro',
+                });
+                console.log(`New transaction created for payment ${paymentId}`);
+              } catch (createError) {
+                console.error('Error creating transaction:', createError);
+              }
             }
           }
 
