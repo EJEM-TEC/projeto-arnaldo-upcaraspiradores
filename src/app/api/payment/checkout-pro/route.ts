@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
     const preferenceData = {
       items: [
         {
+          id: `credit_${userId || 'guest'}_${Date.now()}`,
           title: description || `Adicionar crédito - R$ ${amountValue}`,
           quantity: 1,
           unit_price: amountValue,
@@ -94,7 +95,9 @@ export async function POST(request: NextRequest) {
 
     console.log('Creating Checkout Pro preference:', JSON.stringify(preferenceData, null, 2));
 
-    const result = await preference.create({ body: preferenceData });
+    // Usa 'as any' para evitar problemas de tipagem estrita do SDK
+    // O SDK pode ter tipos mais restritivos que a API real aceita
+    const result = await preference.create({ body: preferenceData as any });
 
     if (!result || !result.id) {
       return NextResponse.json(
