@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 vacuum_agent.py
-Controle de aspirador via GPIO com integração no supabase por POLLING.
+Controle de aspirador (2 MOTORES) via GPIO com integração no supabase por POLLING.
 """
 
 import os
@@ -28,7 +28,9 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise SystemExit("Defina SUPABASE_URL e SUPABASE_KEY no .env")
 
 # --- Config GPIO (Lido do .env) ---
-RELAY_PIN = int(os.getenv("RELAY_PIN", "17"))
+### ESTA PARTE AGORA LÊ "19" E "21" DO SEU .ENV ###
+RELAY_MOTOR_A_PIN = int(os.getenv("RELAY_MOTOR_A_PIN")) # (IN1)
+RELAY_MOTOR_B_PIN = int(os.getenv("RELAY_MOTOR_B_PIN")) # (IN2)
 RELAY_ACTIVE_HIGH = os.getenv("RELAY_ACTIVE_HIGH", "true").lower() in ("1", "true", "yes")
 
 # --- Config de Tempo ---
@@ -43,25 +45,40 @@ logging.info("Iniciando serviço de polling do Supabase...")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Inicializa relé ai meu fi
-relay = OutputDevice(RELAY_PIN, active_high=RELAY_ACTIVE_HIGH, initial_value=False)
+### ESTA PARTE AGORA USA OS PINOS 19 E 21 ###
+logging.info(f"Iniciando Relé Motor A (GPIO{RELAY_MOTOR_A_PIN}) e B (GPIO{RELAY_MOTOR_B_PIN})")
+relay_a = OutputDevice(RELAY_MOTOR_A_PIN, active_high=RELAY_ACTIVE_HIGH, initial_value=False)
+relay_b = OutputDevice(RELAY_MOTOR_B_PIN, active_high=RELAY_ACTIVE_HIGH, initial_value=False)
 
 # Inicializa o sensor DHT (use_pulseio=False é importante no Pi 4/Zero 2)
 SENSOR_PIN_BCM = int(os.getenv("DHT_SENSOR_PIN", "4"))
 dht_sensor = adafruit_dht.DHT11(getattr(board, f"D{SENSOR_PIN_BCM}"), use_pulseio=False)
 
-current_state = "off"
+current_state = "off" # Estado da "máquina" como um todo
 
+### NENHUMA MUDANÇA NECESSÁRIA AQUI ###
+# Esta função já comanda relay_a e relay_b
 def set_relay(state_on: bool) -> None:
-    """Ativa ou desativa o relé e atualiza o estado global."""
+    """Ativa ou desativa AMBOS os relés e atualiza o estado global."""
     global current_state
+    
     if state_on and current_state != "on":
-        relay.on()
+        logging.info("Ligando Motor A e Motor B")
+        relay_a.on()
+        relay_b.on()
         current_state = "on"
-        logging.info("Relay set to ON")
+        logging.info("Relés set to ON")
+        
     elif not state_on and current_state != "off":
-        relay.off()
+        logging.info("Desligando Motor A e Motor B")
+        relay_a.off()
+        relay_b.off()
         current_state = "off"
-        logging.info("Relay set to OFF")
+        logging.info("Relés set to OFF")
+
+# --- O RESTANTE DO CÓDIGO PERMANECE IGUAL ---
+# (Sua lógica de telemetria e polling já usa a função 'set_relay',
+# então não precisamos mudar mais nada)
 
 def get_telemetry_data() -> dict:
     """Lê os sensores e retorna um dicionário de dados."""
@@ -104,10 +121,10 @@ def check_for_commands():
             logging.info(f"Comando recebido do Supabase: {cmd_lower}")
 
             if cmd_lower == "on" and current_state != "on":
-                logging.info("Comando ON -> Ativando relé")
+                logging.info("Comando ON -> Ativando relés")
                 set_relay(True)
             elif cmd_lower == "off" and current_state != "off":
-                logging.info("Comando OFF -> Desativando relé")
+                logging.info("Comando OFF -> Desativando relés")
                 set_relay(False)
             
             # MUITO IMPORTANTE: Limpa o comando no banco para não rodar de novo
