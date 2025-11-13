@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPaymentClient } from '@/lib/mercadopago';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,9 +12,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Busca pagamentos relacionados à preferência ou external_reference
-    const payment = createPaymentClient();
-    
     // Se temos external_reference, podemos buscar pagamentos por ele
     if (externalReference) {
       // Extrai userId do external_reference
