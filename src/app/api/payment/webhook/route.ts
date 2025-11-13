@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPaymentClient } from '@/lib/mercadopago';
 import { supabase } from '@/lib/supabaseClient';
-import { createTransaction } from '@/lib/database';
+import { createTransaction, incrementUserBalance } from '@/lib/database';
 
 // GET para verificação (Mercado Pago pode fazer GET para validar o endpoint)
 export async function GET(_request: NextRequest) {
@@ -106,12 +106,33 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Se o pagamento foi aprovado, pode adicionar lógica adicional aqui
+          // Se o pagamento foi aprovado, incrementa o saldo do usuário
           if (status === 'approved') {
             console.log(`Payment ${paymentId} approved for user ${userId}`);
-            // Aqui você pode adicionar lógica para creditar saldo, enviar email, etc.
+            
+            // Garante que o valor seja um inteiro (em centavos, convertemos para reais)
+            // transactionAmount vem em reais (ex: 5.00), mas precisamos garantir que seja inteiro
+            const amountToAdd = Math.round(transactionAmount);
+            
+            // Incrementa o saldo do usuário na tabela profiles
+            try {
+              const { data: balanceData, error: balanceError } = await incrementUserBalance(
+                userId,
+                amountToAdd
+              );
+
+              if (balanceError) {
+                console.error(`Error incrementing balance for user ${userId}:`, balanceError);
+              } else {
+                console.log(`Balance incremented successfully for user ${userId}. New balance: ${balanceData?.saldo}`);
+              }
+            } catch (balanceError) {
+              console.error(`Unexpected error incrementing balance for user ${userId}:`, balanceError);
+            }
           } else if (status === 'rejected' || status === 'cancelled') {
-            console.log(`Payment ${paymentId} ${status} for user ${userId}`);
+            console.log(`Payment ${paymentId} ${status} for user ${userId} - Balance not incremented`);
+          } else if (status === 'pending' || status === 'in_process') {
+            console.log(`Payment ${paymentId} ${status} for user ${userId} - Waiting for approval`);
           }
         } else {
           console.log(`Payment details not found for ID: ${paymentId}`);

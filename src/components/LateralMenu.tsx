@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
+import CheckoutProModal from '@/components/CheckoutProModal';
 
 interface LateralMenuProps {
     isOpen: boolean;
@@ -17,6 +18,7 @@ interface LateralMenuProps {
 export default function LateralMenu({ isOpen, onClose, user, balance, menuItems, onMenuAction }: LateralMenuProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
     const handleLogout = async () => {
         setLoading(true);
@@ -24,10 +26,19 @@ export default function LateralMenu({ isOpen, onClose, user, balance, menuItems,
         router.push('/login-usuario');
     };
 
+    const handleBalanceClick = () => {
+        setShowCheckoutModal(true);
+    };
+
+    const handleCheckoutSuccess = () => {
+        // Recarrega a página para atualizar o saldo
+        window.location.reload();
+    };
+
     const defaultMenuItems = [
         { icon: '🏠', text: 'Home', action: () => router.push('/home') },
-        { icon: '💰', text: `Meu saldo: R$ ${balance}`, action: () => console.log('Balance clicked') },
-        { icon: '➕', text: 'Adicionar crédito', action: () => console.log('Add credit clicked') },
+        { icon: '💰', text: `Meu saldo: R$ ${balance}`, action: handleBalanceClick },
+        { icon: '➕', text: 'Adicionar crédito', action: handleBalanceClick },
         { icon: '🔄', text: 'Histórico', action: () => console.log('History clicked') },
         { icon: '❓', text: 'Suporte', action: () => console.log('Support clicked') },
         { icon: '📄', text: 'Termos e Condições', action: () => console.log('Terms clicked') },
@@ -40,6 +51,13 @@ export default function LateralMenu({ isOpen, onClose, user, balance, menuItems,
 
     return (
         <>
+            {/* Checkout Pro Modal */}
+            <CheckoutProModal
+                isOpen={showCheckoutModal}
+                onClose={() => setShowCheckoutModal(false)}
+                onSuccess={handleCheckoutSuccess}
+            />
+
             {/* Overlay */}
             <div
                 className="fixed inset-0 bg-black bg-opacity-50 z-40"

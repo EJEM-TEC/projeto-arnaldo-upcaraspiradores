@@ -18,6 +18,7 @@ import HistoryPage from '@/components/mobile/HistoryPage';
 import SupportPage from '@/components/mobile/SupportPage';
 import TermsPage from '@/components/mobile/TermsPage';
 import PrivacyPage from '@/components/mobile/PrivacyPage';
+import CheckoutProModal from '@/components/CheckoutProModal';
 
 type MobileView = 'home' | 'balance' | 'add-credit' | 'pix' | 'credit-card' | 'monthly' | 'pix-code' | 'timer' | 'history' | 'support' | 'terms' | 'privacy';
 
@@ -27,6 +28,7 @@ export default function MobileDashboard() {
     const [user, setUser] = useState<User | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [paymentData, setPaymentData] = useState<{
         amount: string;
         cpf?: string;
@@ -119,7 +121,7 @@ export default function MobileDashboard() {
             case 'home':
                 return <HomePage />;
             case 'balance':
-                return <BalancePage balance={balance} />;
+                return <BalancePage balance={balance} onAddCredit={() => setShowCheckoutModal(true)} />;
             case 'add-credit':
                 return <AddCreditPage onPaymentSelect={handlePaymentSelect} />;
             case 'pix':
@@ -159,10 +161,20 @@ export default function MobileDashboard() {
         setIsMenuOpen(false);
     };
 
+    const handleBalanceClick = () => {
+        setShowCheckoutModal(true);
+        setIsMenuOpen(false);
+    };
+
+    const handleCheckoutSuccess = () => {
+        // Recarrega a página para atualizar o saldo
+        window.location.reload();
+    };
+
     const menuItems = [
         { icon: '🏠', text: 'Home', action: () => setCurrentView('home') },
-        { icon: '💰', text: `Meu saldo: R$ ${balance}`, action: () => setCurrentView('balance') },
-        { icon: '➕', text: 'Adicionar crédito', action: () => setCurrentView('add-credit') },
+        { icon: '💰', text: `Meu saldo: R$ ${balance}`, action: handleBalanceClick },
+        { icon: '➕', text: 'Adicionar crédito', action: handleBalanceClick },
         { icon: '🔄', text: 'Histórico', action: () => setCurrentView('history') },
         { icon: '❓', text: 'Suporte', action: () => setCurrentView('support') },
         { icon: '📄', text: 'Termos e Condições', action: () => setCurrentView('terms') },
@@ -182,6 +194,13 @@ export default function MobileDashboard() {
 
     return (
         <div className="min-h-screen bg-black relative">
+            {/* Checkout Pro Modal */}
+            <CheckoutProModal
+                isOpen={showCheckoutModal}
+                onClose={() => setShowCheckoutModal(false)}
+                onSuccess={handleCheckoutSuccess}
+            />
+
             {/* Lateral Menu */}
             <LateralMenu
                 isOpen={isMenuOpen}
@@ -214,7 +233,7 @@ export default function MobileDashboard() {
 
                         {/* Add Balance Button */}
                         <button
-                            onClick={() => setCurrentView('add-credit')}
+                            onClick={() => setShowCheckoutModal(true)}
                             className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center mx-auto hover:bg-orange-600 transition-colors"
                         >
                             <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

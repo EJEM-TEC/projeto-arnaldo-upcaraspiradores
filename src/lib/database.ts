@@ -104,6 +104,87 @@ export async function getUserRole(userId: string) {
   return { data, error: null };
 }
 
+// Profile balance functions
+// Get user balance from profiles table
+export async function getUserBalance(userId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('saldo')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    // Se a tabela não existir ou não houver registro, retorna saldo 0
+    if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+      return { data: { saldo: 0 }, error: null };
+    }
+    console.error('Error fetching user balance:', error);
+    return { data: null, error };
+  }
+
+  return { data: data || { saldo: 0 }, error: null };
+}
+
+// Increment user balance (add amount to existing balance)
+export async function incrementUserBalance(userId: string, amount: number) {
+  // Primeiro, busca o saldo atual
+  const { data: currentBalance, error: fetchError } = await getUserBalance(userId);
+  
+  if (fetchError) {
+    console.error('Error fetching current balance:', fetchError);
+    return { data: null, error: fetchError };
+  }
+
+  const currentSaldo = Math.round(currentBalance?.saldo || 0);
+  const amountRounded = Math.round(amount);
+  const newSaldo = Math.round(currentSaldo + amountRounded);
+
+  // Atualiza ou cria o registro na tabela profiles
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert({
+      id: userId,
+      saldo: newSaldo, // Garantido como inteiro
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'id'
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error incrementing user balance:', error);
+    return { data: null, error };
+  }
+
+  console.log(`Balance incremented for user ${userId}: ${currentSaldo} + ${amount} = ${newSaldo}`);
+  return { data, error: null };
+}
+
+// Update user balance (set absolute value)
+export async function updateUserBalance(userId: string, saldo: number) {
+  const saldoInt = Math.round(saldo); // Garante que seja inteiro
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert({
+      id: userId,
+      saldo: saldoInt, // Garantido como inteiro
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'id'
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating user balance:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
 // Machine-related functions
 export interface Machine {
   id: number;
