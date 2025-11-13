@@ -40,7 +40,44 @@ export async function createUserProfile(user: {
     return { data: null, error };
   }
 
+  // Cria o perfil na tabela profiles com saldo 0
+  await ensureProfileExists(user.id);
+
   return { data, error: null };
+}
+
+// Garante que o perfil existe na tabela profiles com saldo 0
+export async function ensureProfileExists(userId: string) {
+  // Verifica se o perfil já existe
+  const { data: existingProfile, error: checkError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  // Se não existe, cria com saldo 0
+  if (!existingProfile && (!checkError || checkError.code === 'PGRST116')) {
+    const { error: insertError } = await supabase
+      .from('profiles')
+      .insert([
+        {
+          id: userId,
+          saldo: 0,
+        },
+      ]);
+
+    if (insertError) {
+      // Se o erro for de duplicação, tudo bem (pode ter sido criado entre a verificação e a inserção)
+      if (insertError.code !== '23505') {
+        console.error('Error creating profile:', insertError);
+        return { data: null, error: insertError };
+      }
+    } else {
+      console.log(`Profile created for user ${userId} with saldo 0`);
+    }
+  }
+
+  return { data: { id: userId, saldo: 0 }, error: null };
 }
 
 // Get user profile from database
@@ -107,6 +144,9 @@ export async function getUserRole(userId: string) {
 // Profile balance functions
 // Get user balance from profiles table
 export async function getUserBalance(userId: string) {
+  // Primeiro, garante que o perfil existe
+  await ensureProfileExists(userId);
+
   const { data, error } = await supabase
     .from('profiles')
     .select('saldo')

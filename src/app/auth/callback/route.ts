@@ -92,6 +92,24 @@ export async function GET(request: NextRequest) {
           } else {
             console.log('User profile created successfully for:', user.email);
           }
+
+          // Garante que o perfil existe na tabela profiles com saldo 0
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert([
+              {
+                id: user.id,
+                saldo: 0,
+              },
+            ], {
+              onConflict: 'id'
+            });
+
+          if (profileError) {
+            console.error('Error creating/updating profile:', profileError);
+          } else {
+            console.log('Profile created/updated with saldo 0 for:', user.email);
+          }
         } else if (profileError) {
           // Erro diferente de "não encontrado" - pode ser problema
           console.error('Error checking user profile:', profileError);
