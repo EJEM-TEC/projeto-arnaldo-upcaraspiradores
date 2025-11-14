@@ -44,11 +44,9 @@ export default function MobileDashboard() {
             const response = await fetch(`/api/machine/get-balance?userId=${userId}`);
             if (response.ok) {
                 const data = await response.json();
-                // Balance é armazenado em reais como inteiro
                 const balanceValue = data.balance || 0;
                 const formattedBalance = balanceValue.toFixed(2).replace('.', ',');
                 setBalance(formattedBalance);
-                console.log(`Balance loaded: R$ ${formattedBalance}`);
             }
         } catch (error) {
             console.error('Error loading balance:', error);
@@ -56,38 +54,8 @@ export default function MobileDashboard() {
         }
     };
 
-    // Setup real-time listener for balance changes
-    const setupBalanceListener = (userId: string) => {
-        console.log('Setting up balance listener for user:', userId);
-        
-        const subscription = supabase
-            .channel(`profiles:${userId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'profiles',
-                    filter: `id=eq.${userId}`
-                },
-                (payload) => {
-                    console.log('Balance update received:', payload);
-                    if (payload.new && payload.new.saldo !== undefined) {
-                        const newSaldo = payload.new.saldo;
-                        const formattedBalance = newSaldo.toFixed(2).replace('.', ',');
-                        setBalance(formattedBalance);
-                        console.log(`Balance updated in real-time: R$ ${formattedBalance}`);
-                    }
-                }
-            )
-            .subscribe();
-
-        return subscription;
-    };
-
     useEffect(() => {
         const checkAuth = async () => {
-            // Primeiro tenta obter a sessão
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
             if (sessionError) {
@@ -97,7 +65,6 @@ export default function MobileDashboard() {
             }
 
             if (!session || !session.user) {
-                // Se não há sessão, tenta obter o usuário diretamente
                 const { data: { user }, error: userError } = await supabase.auth.getUser();
 
                 if (!user || userError) {
@@ -107,40 +74,41 @@ export default function MobileDashboard() {
 
                 setUser(user);
                 loadBalance(user.id);
-                setupBalanceListener(user.id);
                 setLoading(false);
-
-                // Polling a cada 3 segundos como fallback
-                const interval = setInterval(() => loadBalance(user.id), 3000);
-                return () => clearInterval(interval);
             } else {
                 setUser(session.user);
                 loadBalance(session.user.id);
-                setupBalanceListener(session.user.id);
                 setLoading(false);
-
-                // Polling a cada 3 segundos como fallback
-                const interval = setInterval(() => loadBalance(session.user.id), 3000);
-                return () => clearInterval(interval);
             }
         };
 
         checkAuth();
 
-        // Listener para mudanças de autenticação
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
                 setUser(session.user);
                 loadBalance(session.user.id);
-                setupBalanceListener(session.user.id);
                 setLoading(false);
             } else {
                 router.push('/login-usuario');
             }
         });
 
-        return () => subscription.unsubscribe();
-    }, [router]);
+        // Polling simples a cada 2 segundos
+        let intervalId: ReturnType<typeof setInterval> | null = null;
+        const startPolling = (userId: string) => {
+            intervalId = setInterval(() => loadBalance(userId), 2000);
+        };
+
+        if (user?.id) {
+            startPolling(user.id);
+        }
+
+        return () => {
+            subscription.unsubscribe();
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [router, user?.id]);
 
     const handlePaymentSelect = (method: string) => {
         switch (method) {

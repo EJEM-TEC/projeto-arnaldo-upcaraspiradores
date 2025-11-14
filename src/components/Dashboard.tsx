@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import DashboardLayout from './DashboardLayout';
-import { obterClientePorId } from '@/lib/clientes';
 import MudarSenhaForm from './mudar-senha';
 import { AddMachineForm } from './AddMachineForm';
 import { getAllMachines, Machine, getAllActivationHistory, ActivationHistory, createTransaction, getBillingData, Transaction, BillingData } from '@/lib/database';
@@ -193,9 +192,9 @@ export default function Dashboard() {
 
     setLoadingClient(true);
     try {
-      const clientId = parseInt(id);
-      const cliente = obterClientePorId(clientId);
-      setClientName(cliente ? cliente.name : 'Cliente não encontrado');
+      const { getUserProfile } = await import('@/lib/database');
+      const { data: user } = await getUserProfile(id);
+      setClientName(user ? (user.full_name || user.email || 'Cliente não encontrado') : 'Cliente não encontrado');
     } catch {
       setClientName('Cliente não encontrado');
     } finally {
@@ -311,18 +310,19 @@ export default function Dashboard() {
           }
 
           try {
-            // Buscar o UUID do usuário pelo ID (assumindo que clientId é o ID na tabela usuarios)
-            // Se não encontrar, criar transação sem user_id
-            let userId: string | null = null;
-            if (clientId.trim()) {
-              // Usar o clientId como está (pode ser UUID ou ID numérico)
-                userId = clientId.trim();
-            }
+            const userId = clientId.trim();
+
+            // Importar as funções necessárias
+            const { incrementUserBalance } = await import('@/lib/database');
+
+            // Incrementar o saldo do cliente
+            await incrementUserBalance(userId, amountValue);
 
             const description = clientName
               ? `Crédito adicionado para ${clientName}`
               : `Crédito adicionado - Cliente ID: ${clientId}`;
 
+            // Criar transação para registro
             const { error } = await createTransaction({
               user_id: userId || undefined,
               amount: amountValue,
@@ -332,17 +332,14 @@ export default function Dashboard() {
             });
 
             if (error) {
-              alert(`Erro ao adicionar crédito: ${error.message}`);
+              alert(`Erro ao registrar transação: ${error.message}`);
             } else {
-              alert(`Crédito de R$ ${amountValue.toFixed(2)} adicionado com sucesso!`);
+              alert(`Crédito de R$ ${amountValue.toFixed(2)} adicionado com sucesso para ${clientName || clientId}!`);
               // Limpar formulário
               setClientId('');
               setClientName('');
               setAmount('');
               setPaymentMethod('');
-
-              // Recarregar histórico de caixa se estiver visível
-              // Isso será feito automaticamente pelo useEffect quando currentView mudar
             }
           } catch (error) {
             console.error('Erro ao adicionar crédito:', error);
