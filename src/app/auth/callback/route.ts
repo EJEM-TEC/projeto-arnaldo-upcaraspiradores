@@ -9,10 +9,12 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code');
   const error = requestUrl.searchParams.get('error');
 
-  // Define origin para produção ou desenvolvimento
-  const origin = process.env.NODE_ENV === 'production' 
-    ? 'https://www.upaspiradores.com.br' 
-    : requestUrl.origin;
+  // Define origin - prefere NEXT_PUBLIC_APP_URL, depois NODE_ENV, depois requestUrl.origin
+  const origin = process.env.NEXT_PUBLIC_APP_URL 
+    ? process.env.NEXT_PUBLIC_APP_URL
+    : (process.env.NODE_ENV === 'production' 
+      ? 'https://www.upaspiradores.com.br' 
+      : requestUrl.origin);
 
   // Se houver um erro (ex: usuário cancelou o login)
   if (error) {
@@ -57,7 +59,11 @@ export async function GET(request: NextRequest) {
       // Obtém o usuário da sessão
       const user = sessionData?.user;
 
+      console.log('User from session:', user?.email, 'ID:', user?.id);
+
       if (user) {
+        console.log('Processing user:', user.email);
+        
         // Verifica se o perfil do usuário já existe na tabela usuarios
         const { data: existingProfile, error: profileError } = await supabase
           .from('usuarios')
@@ -65,14 +71,20 @@ export async function GET(request: NextRequest) {
           .eq('id', user.id)
           .maybeSingle();
 
+        console.log('Existing profile check:', { existingProfile, profileError });
+
         // Se o perfil não existe, cria um novo
         // Se existingProfile for null, significa que não encontrou (normal para novos usuários)
         if (!existingProfile && (!profileError || profileError.code === 'PGRST116')) {
+          console.log('Creating new profile for user:', user.email);
+          
           // Extrai o nome do usuário do metadata do Google
           const fullName = user.user_metadata?.full_name || 
                           user.user_metadata?.name || 
                           user.email?.split('@')[0] || 
                           'Usuário';
+
+          console.log('Full name extracted:', fullName);
 
           // Cria o perfil do usuário
           const { error: insertError } = await supabase
