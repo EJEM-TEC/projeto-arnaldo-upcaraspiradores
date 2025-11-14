@@ -24,7 +24,7 @@ type MobileView = 'home' | 'balance' | 'add-credit' | 'pix' | 'credit-card' | 'm
 
 export default function MobileDashboard() {
     const [currentView, setCurrentView] = useState<MobileView>('add-credit');
-    const [balance] = useState('0,00');
+    const [balance, setBalance] = useState('0,00');
     const [user, setUser] = useState<User | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -37,6 +37,23 @@ export default function MobileDashboard() {
         qrCode?: string;
     } | null>(null);
     const router = useRouter();
+
+    // Load balance from database
+    const loadBalance = async (userId: string) => {
+        try {
+            const response = await fetch(`/api/machine/get-balance?userId=${userId}`);
+            if (response.ok) {
+                const data = await response.json();
+                // Balance é armazenado em reais como inteiro
+                const balanceValue = data.balance || 0;
+                const formattedBalance = balanceValue.toFixed(2).replace('.', ',');
+                setBalance(formattedBalance);
+            }
+        } catch (error) {
+            console.error('Error loading balance:', error);
+            setBalance('0,00');
+        }
+    };
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -59,9 +76,11 @@ export default function MobileDashboard() {
                 }
 
                 setUser(user);
+                loadBalance(user.id);
                 setLoading(false);
             } else {
                 setUser(session.user);
+                loadBalance(session.user.id);
                 setLoading(false);
             }
         };
@@ -72,6 +91,7 @@ export default function MobileDashboard() {
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
                 setUser(session.user);
+                loadBalance(session.user.id);
                 setLoading(false);
             } else {
                 router.push('/login-usuario');
@@ -111,9 +131,76 @@ export default function MobileDashboard() {
         setCurrentView('timer');
     };
 
-    const handleTimerStart = () => {
-        console.log('Timer started');
-        // Here you would start the vacuum cleaner timer
+    const handleTimerStart = async (durationMinutes: number) => {
+        console.log('Timer started with duration:', durationMinutes);
+        if (!user) return;
+
+        try {
+            setLoading(true);
+            
+            // Chama a API para ativar a máquina (máquina 1 por padrão)
+            const response = await fetch('/api/machine/activate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: user.id,
+                    machineId: 1, // ID padrão da máquina
+                    durationMinutes: durationMinutes
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                alert(`Erro: ${errorData.error}`);
+                setLoading(false);
+                // Recarrega o saldo em caso de erro
+                loadBalance(user.id);
+                return;
+            }
+
+            const data = await response.json();
+            console.log('Machine activated:', data);
+
+            // Recarrega o saldo
+            loadBalance(user.id);
+            setLoading(false);
+
+            // Inicia o countdown
+            let remainingSeconds = durationMinutes * 60;
+            
+            const countdownInterval = setInterval(async () => {
+                remainingSeconds--;
+                
+                if (remainingSeconds <= 0) {
+                    clearInterval(countdownInterval);
+                    
+                    // Desativa a máquina
+                    try {
+                        await fetch('/api/machine/deactivate', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                machineId: 1
+                            })
+                        });
+                    } catch (error) {
+                        console.error('Error deactivating machine:', error);
+                    }
+
+                    alert('Tempo de uso expirou! Máquina desativada.');
+                    setCurrentView('home');
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error('Error activating machine:', error);
+            alert('Erro ao ativar a máquina');
+            setLoading(false);
+        }
     };
 
     const renderContent = () => {

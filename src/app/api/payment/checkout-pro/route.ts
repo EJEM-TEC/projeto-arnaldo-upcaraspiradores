@@ -53,9 +53,11 @@ export async function POST(request: NextRequest) {
     const preference = new Preference(client);
 
     // URL base da aplicação
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-      'https://projeto-arnaldo-upcaraspiradores.vercel.app';
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? 'https://www.upaspiradores.com.br'
+      : (process.env.NEXT_PUBLIC_APP_URL || 
+         (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+         'http://localhost:3000');
 
     // External reference para identificar o pagamento
     const externalReference = `USER_${userId || 'guest'}_${Date.now()}`;

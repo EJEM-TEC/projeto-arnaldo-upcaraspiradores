@@ -754,3 +754,82 @@ export async function getMonthlyBilling(year: number, month: number) {
   const endDate = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
   return getBillingData(startDate, endDate);
 }
+
+// Machine command control functions
+// Set machine command to 'on' or 'off'
+export async function setMachineCommand(machineId: number, command: 'on' | 'off') {
+  const { data, error } = await supabase
+    .from('machines')
+    .update({ 
+      command: command,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', machineId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error(`Error setting machine ${machineId} command to ${command}:`, error);
+    return { data: null, error };
+  }
+
+  console.log(`Machine ${machineId} command set to ${command}`);
+  return { data, error: null };
+}
+
+// Get machine command status
+export async function getMachineCommand(machineId: number) {
+  const { data, error } = await supabase
+    .from('machines')
+    .select('command')
+    .eq('id', machineId)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`Error getting machine ${machineId} command:`, error);
+    return { data: null, error };
+  }
+
+  return { data: data?.command || 'off', error: null };
+}
+
+// Decrement user balance (subtract amount from balance)
+export async function decrementUserBalance(userId: string, amount: number) {
+  // Primeiro, busca o saldo atual
+  const { data: currentBalance, error: fetchError } = await getUserBalance(userId);
+  
+  if (fetchError) {
+    console.error('Error fetching current balance:', fetchError);
+    return { data: null, error: fetchError };
+  }
+
+  const currentSaldo = Math.round(currentBalance?.saldo || 0);
+  const amountRounded = Math.round(amount);
+  const newSaldo = Math.max(0, Math.round(currentSaldo - amountRounded)); // Não permite saldo negativo
+
+  // Se saldo é insuficiente, retorna erro
+  if (currentSaldo < amountRounded) {
+    const error = new Error('Saldo insuficiente');
+    console.error(`Insufficient balance for user ${userId}: current=${currentSaldo}, required=${amountRounded}`);
+    return { data: null, error };
+  }
+
+  // Atualiza o saldo na tabela profiles
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      saldo: newSaldo,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error decrementing user balance:', error);
+    return { data: null, error };
+  }
+
+  console.log(`Balance decremented for user ${userId}: ${currentSaldo} - ${amount} = ${newSaldo}`);
+  return { data, error: null };
+}

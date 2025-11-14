@@ -9,9 +9,14 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code');
   const error = requestUrl.searchParams.get('error');
 
+  // Define origin para produção ou desenvolvimento
+  const origin = process.env.NODE_ENV === 'production' 
+    ? 'https://www.upaspiradores.com.br' 
+    : requestUrl.origin;
+
   // Se houver um erro (ex: usuário cancelou o login)
   if (error) {
-    return NextResponse.redirect(`${requestUrl.origin}/login-usuario?error=${error}`);
+    return NextResponse.redirect(`${origin}/login-usuario?error=${error}`);
   }
 
   // Se houver um código de autorização na URL, troque-o por uma sessão
@@ -46,7 +51,7 @@ export async function GET(request: NextRequest) {
 
       if (sessionError) {
         console.error('Error exchanging code for session:', sessionError);
-        return NextResponse.redirect(`${requestUrl.origin}/login-usuario?error=auth_failed`);
+        return NextResponse.redirect(`${origin}/login-usuario?error=auth_failed`);
       }
 
       // Obtém o usuário da sessão
@@ -94,7 +99,7 @@ export async function GET(request: NextRequest) {
           }
 
           // Garante que o perfil existe na tabela profiles com saldo 0
-          const { error: profileError } = await supabase
+          const { error: createProfileError } = await supabase
             .from('profiles')
             .upsert([
               {
@@ -105,8 +110,8 @@ export async function GET(request: NextRequest) {
               onConflict: 'id'
             });
 
-          if (profileError) {
-            console.error('Error creating/updating profile:', profileError);
+          if (createProfileError) {
+            console.error('Error creating/updating profile:', createProfileError);
           } else {
             console.log('Profile created/updated with saldo 0 for:', user.email);
           }
@@ -119,10 +124,10 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.error('Unexpected error in OAuth callback:', error);
-      return NextResponse.redirect(`${requestUrl.origin}/login-usuario?error=unexpected_error`);
+      return NextResponse.redirect(`${origin}/login-usuario?error=unexpected_error`);
     }
   }
 
   // Redireciona o usuário para a página home (mobile dashboard) após o login
-  return NextResponse.redirect(`${requestUrl.origin}/home`);
+  return NextResponse.redirect(`${origin}/home`);
 }

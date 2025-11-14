@@ -95,14 +95,13 @@ export async function middleware(req: NextRequest) {
   const isSuperAdmin = user.email === 'arnaldfirst@gmail.com'
   
   // Se um 'cliente' tenta acessar uma página de 'admin'
-  if (req.nextUrl.pathname.startsWith('/painel_de_controle') && userRole !== 'admin') {
+  if (req.nextUrl.pathname.startsWith('/painel_de_controle') && userRole !== 'admin' && !isSuperAdmin) {
     return NextResponse.redirect(new URL('/home', req.url))
   }
 
-  // Se um 'admin' tenta acessar uma página de 'cliente' (exceto arnaldfirst@gmail.com que pode acessar tudo)
-  if (req.nextUrl.pathname.startsWith('/cliente') && userRole !== 'cliente' && !isSuperAdmin) {
-    return NextResponse.redirect(new URL('/painel_de_controle', req.url))
-  }
+  // Se um 'cliente' tenta acessar uma página de 'home' (cliente normal), permite
+  // Se um 'admin' tenta acessar 'home', permite (admins podem acessar site normal)
+  // Ambos podem acessar /home, apenas não-admin e não-super-admin são redirecionados de /painel_de_controle
 
   return response
 }
