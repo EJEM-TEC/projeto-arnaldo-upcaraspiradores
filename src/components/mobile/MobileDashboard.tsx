@@ -48,11 +48,41 @@ export default function MobileDashboard() {
                 const balanceValue = data.balance || 0;
                 const formattedBalance = balanceValue.toFixed(2).replace('.', ',');
                 setBalance(formattedBalance);
+                console.log(`Balance loaded: R$ ${formattedBalance}`);
             }
         } catch (error) {
             console.error('Error loading balance:', error);
             setBalance('0,00');
         }
+    };
+
+    // Setup real-time listener for balance changes
+    const setupBalanceListener = (userId: string) => {
+        console.log('Setting up balance listener for user:', userId);
+        
+        const subscription = supabase
+            .channel(`profiles:${userId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles',
+                    filter: `id=eq.${userId}`
+                },
+                (payload) => {
+                    console.log('Balance update received:', payload);
+                    if (payload.new && payload.new.saldo !== undefined) {
+                        const newSaldo = payload.new.saldo;
+                        const formattedBalance = newSaldo.toFixed(2).replace('.', ',');
+                        setBalance(formattedBalance);
+                        console.log(`Balance updated in real-time: R$ ${formattedBalance}`);
+                    }
+                }
+            )
+            .subscribe();
+
+        return subscription;
     };
 
     useEffect(() => {
@@ -77,11 +107,21 @@ export default function MobileDashboard() {
 
                 setUser(user);
                 loadBalance(user.id);
+                setupBalanceListener(user.id);
                 setLoading(false);
+
+                // Polling a cada 3 segundos como fallback
+                const interval = setInterval(() => loadBalance(user.id), 3000);
+                return () => clearInterval(interval);
             } else {
                 setUser(session.user);
                 loadBalance(session.user.id);
+                setupBalanceListener(session.user.id);
                 setLoading(false);
+
+                // Polling a cada 3 segundos como fallback
+                const interval = setInterval(() => loadBalance(session.user.id), 3000);
+                return () => clearInterval(interval);
             }
         };
 
@@ -92,6 +132,7 @@ export default function MobileDashboard() {
             if (session?.user) {
                 setUser(session.user);
                 loadBalance(session.user.id);
+                setupBalanceListener(session.user.id);
                 setLoading(false);
             } else {
                 router.push('/login-usuario');
