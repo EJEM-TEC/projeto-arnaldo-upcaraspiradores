@@ -194,7 +194,7 @@ export default function Dashboard() {
     try {
       const { getUserProfile } = await import('@/lib/database');
       const { data: user } = await getUserProfile(id);
-      setClientName(user ? (user.full_name || user.email || 'Cliente não encontrado') : 'Cliente não encontrado');
+      setClientName(user ? (user.name || user.email || 'Cliente não encontrado') : 'Cliente não encontrado');
     } catch {
       setClientName('Cliente não encontrado');
     } finally {
@@ -312,11 +312,21 @@ export default function Dashboard() {
           try {
             const userId = clientId.trim();
 
-            // Importar as funções necessárias
-            const { incrementUserBalance } = await import('@/lib/database');
+            // Chamar a API route para incrementar saldo (bypass RLS)
+            const addBalanceResponse = await fetch('/api/machine/add-balance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId,
+                amount: amountValue
+              })
+            });
 
-            // Incrementar o saldo do cliente
-            await incrementUserBalance(userId, amountValue);
+            if (!addBalanceResponse.ok) {
+              const errorData = await addBalanceResponse.json();
+              alert(`Erro ao incrementar saldo: ${errorData.error}`);
+              return;
+            }
 
             const description = clientName
               ? `Crédito adicionado para ${clientName}`

@@ -75,14 +75,22 @@ export default function MobileDashboard() {
                 setUser(user);
                 loadBalance(user.id);
                 setLoading(false);
+                
+                // Iniciar polling para este usuário
+                const intervalId = setInterval(() => loadBalance(user.id), 2000);
+                return () => clearInterval(intervalId);
             } else {
                 setUser(session.user);
                 loadBalance(session.user.id);
                 setLoading(false);
+                
+                // Iniciar polling para este usuário
+                const intervalId = setInterval(() => loadBalance(session.user.id), 2000);
+                return () => clearInterval(intervalId);
             }
         };
 
-        checkAuth();
+        const cleanupAuth = checkAuth();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
@@ -94,21 +102,13 @@ export default function MobileDashboard() {
             }
         });
 
-        // Polling simples a cada 2 segundos
-        let intervalId: ReturnType<typeof setInterval> | null = null;
-        const startPolling = (userId: string) => {
-            intervalId = setInterval(() => loadBalance(userId), 2000);
-        };
-
-        if (user?.id) {
-            startPolling(user.id);
-        }
-
         return () => {
             subscription.unsubscribe();
-            if (intervalId) clearInterval(intervalId);
+            if (cleanupAuth instanceof Function) {
+                cleanupAuth();
+            }
         };
-    }, [router, user?.id]);
+    }, [router]);
 
     const handlePaymentSelect = (method: string) => {
         switch (method) {
