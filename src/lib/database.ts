@@ -833,3 +833,70 @@ export async function decrementUserBalance(userId: string, amount: number) {
   console.log(`Balance decremented for user ${userId}: ${currentSaldo} - ${amount} = ${newSaldo}`);
   return { data, error: null };
 }
+
+// Get user activation history (máquinas que o usuário já usou)
+export async function getUserActivationHistory(userId: string, limit: number = 50) {
+  try {
+    const { data, error } = await supabase
+      .from('activation_history')
+      .select(`
+        id,
+        machine_id,
+        started_at,
+        ended_at,
+        duration_minutes,
+        cost,
+        status,
+        machines (
+          id,
+          location
+        )
+      `)
+      .eq('user_id', userId)
+      .order('started_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching user activation history:', error);
+      // Se a coluna user_id não existe, retorna dados vazios (será criada na migração)
+      if (error.message?.includes('column') || error.message?.includes('does not exist')) {
+        return { data: [], error: null };
+      }
+      return { data: null, error };
+    }
+
+    return { data: data || [], error: null };
+  } catch (err) {
+    console.error('Unexpected error fetching user activation history:', err);
+    return { data: null, error: err as Error };
+  }
+}
+
+// Atualiza activation_history com user_id e cost quando a máquina é ativada
+export async function updateActivationHistoryWithUser(
+  activationId: number,
+  userId: string,
+  cost: number
+) {
+  try {
+    const { data, error } = await supabase
+      .from('activation_history')
+      .update({
+        user_id: userId,
+        cost: Math.round(cost),
+      })
+      .eq('id', activationId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating activation history with user:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('Unexpected error updating activation history:', err);
+    return { data: null, error: err as Error };
+  }
+}

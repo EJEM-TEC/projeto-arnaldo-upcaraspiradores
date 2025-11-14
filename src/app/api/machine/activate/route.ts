@@ -3,7 +3,8 @@ import {
   decrementUserBalance, 
   setMachineCommand, 
   createActivationHistory,
-  getUserBalance 
+  getUserBalance,
+  updateActivationHistoryWithUser
 } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Cria um registro de ativação
-    const { error: historyError } = await createActivationHistory({
+    const { data: historyData, error: historyError } = await createActivationHistory({
       machine_id: machineId,
       command: 'on',
       started_at: new Date().toISOString(),
@@ -82,6 +83,9 @@ export async function POST(request: NextRequest) {
     if (historyError) {
       console.error('Error creating activation history:', historyError);
       // Não é crítico se o histórico não for criado
+    } else if (historyData && historyData.id) {
+      // Atualiza o histórico com user_id e cost
+      await updateActivationHistoryWithUser(historyData.id, userId, totalPrice);
     }
 
     return NextResponse.json(
@@ -91,7 +95,8 @@ export async function POST(request: NextRequest) {
         durationMinutes,
         totalPrice,
         newBalance: currentBalance - totalPrice,
-        machineId
+        machineId,
+        activationId: historyData?.id
       },
       { status: 200 }
     );
