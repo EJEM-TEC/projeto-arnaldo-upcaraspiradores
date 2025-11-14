@@ -3,8 +3,11 @@ import { supabaseServer } from '@/lib/supabaseServer';
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('📥 POST /api/machine/add-balance called');
     const body = await request.json();
     const { userId, amount } = body;
+
+    console.log('📊 Request data:', { userId, amount });
 
     if (!userId || !amount) {
       return NextResponse.json(
@@ -21,6 +24,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log(`💰 Fetching current balance for user ${userId}`);
+
     // Busca o saldo atual do usuário
     const { data: currentBalance, error: fetchError } = await supabaseServer
       .from('profiles')
@@ -29,7 +34,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (fetchError) {
-      console.error('Error fetching balance:', fetchError);
+      console.error('❌ Error fetching balance:', fetchError);
       return NextResponse.json(
         { error: 'Erro ao obter saldo', details: fetchError.message },
         { status: 500 }
@@ -39,6 +44,8 @@ export async function POST(request: NextRequest) {
     const currentSaldo = Math.round(currentBalance?.saldo || 0);
     const amountRounded = Math.round(amountValue);
     const newSaldo = Math.round(currentSaldo + amountRounded);
+
+    console.log(`📈 Calculating new balance: ${currentSaldo} + ${amountValue} = ${newSaldo}`);
 
     // Incrementa o saldo usando service role (bypass RLS)
     const { data, error } = await supabaseServer
@@ -54,14 +61,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Error incrementing balance:', error);
+      console.error('❌ Error incrementing balance:', error);
       return NextResponse.json(
         { error: 'Erro ao incrementar saldo', details: error.message },
         { status: 500 }
       );
     }
 
-    console.log(`Balance incremented for user ${userId}: ${currentSaldo} + ${amountValue} = ${newSaldo}`);
+    console.log(`✅ Balance incremented for user ${userId}: ${currentSaldo} + ${amountValue} = ${newSaldo}`);
 
     return NextResponse.json(
       {
@@ -75,9 +82,9 @@ export async function POST(request: NextRequest) {
     );
 
   } catch (error) {
-    console.error('Unexpected error in add balance route:', error);
+    console.error('❌ Unexpected error in add balance route:', error);
     return NextResponse.json(
-      { error: 'Erro ao processar solicitação' },
+      { error: 'Erro ao processar solicitação', details: String(error) },
       { status: 500 }
     );
   }
