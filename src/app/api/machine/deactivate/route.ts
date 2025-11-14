@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { 
   setMachineCommand,
   updateActivationHistory,
-  getActivationHistoryByMachine
+  getActivationHistoryByMachine,
+  ActivationHistory
 } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     if (!historyError && historyData && historyData.length > 0) {
       // Encontra o registro que está em andamento
-      const activeRecord = historyData.find((h: any) => h.status === 'em_andamento' || !h.ended_at);
+      const activeRecord = historyData.find((h: ActivationHistory) => h.status === 'em_andamento' || !h.ended_at);
       
       if (activeRecord) {
         const startedAt = new Date(activeRecord.started_at);

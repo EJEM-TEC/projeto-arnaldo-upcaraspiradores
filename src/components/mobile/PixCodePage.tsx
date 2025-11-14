@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 interface PixCodePageProps {
     amount: string;
@@ -40,10 +41,12 @@ export default function PixCodePage({ amount, pixCode, qrCode, onCopyCode }: Pix
                 <div className="flex flex-col items-center space-y-4">
                     {/* QR Code */}
                     {qrCode && (
-                        <img 
+                        <Image 
                             src={`data:image/png;base64,${qrCode}`} 
                             alt="QR Code PIX" 
-                            className="w-48 h-48 border-2 border-gray-300 rounded-lg"
+                            width={192}
+                            height={192}
+                            className="border-2 border-gray-300 rounded-lg"
                         />
                     )}
                     

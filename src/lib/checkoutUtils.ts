@@ -85,9 +85,9 @@ export async function openCheckoutPro({
       throw new Error('Não foi possível abrir o pop-up. Verifique se os pop-ups estão bloqueados.');
     }
 
-    // Armazena o externalReference para verificação posterior
-    const externalReference = data.externalReference;
-    const preferenceId = data.preferenceId;
+    // Armazena o externalReference para verificação posterior (pode ser usado para logs/debug)
+    // const externalReference = data.externalReference;
+    // const preferenceId = data.preferenceId;
 
     // Função para verificar o status do pagamento
     const checkPaymentStatus = async (): Promise<boolean> => {
@@ -104,11 +104,11 @@ export async function openCheckoutPro({
           if (balanceResponse.ok) {
             const balanceData = await balanceResponse.json();
             const currentBalance = balanceData.balance || 0;
-            const expectedBalance = (initialBalance || 0) + parseFloat(amount);
+            const expectedBalance = parseFloat(amount);
             
             // Se o saldo aumentou pelo valor esperado, o pagamento foi processado
             if (currentBalance >= expectedBalance) {
-              console.log(`Payment confirmed: balance increased from ${initialBalance || 0} to ${currentBalance}`);
+              console.log(`Payment confirmed: balance increased to ${currentBalance}`);
               return true;
             }
             
