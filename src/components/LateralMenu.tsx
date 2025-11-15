@@ -31,8 +31,8 @@ export default function LateralMenu({ isOpen, onClose, user, balance, menuItems,
     };
 
     const handleCheckoutSuccess = () => {
-        // Recarrega a página para atualizar o saldo
-        window.location.reload();
+        // O hook useBalance vai atualizar o saldo automaticamente via realtime
+        setShowCheckoutModal(false);
     };
 
     const defaultMenuItems = [

@@ -24,28 +24,38 @@ export default function SignUpPage() {
             setLoading(false);
             return;
         }
-        // ... (outras validações continuam as mesmas)
+
+        if (password.length < 6) {
+            setError('A senha deve ter no mínimo 6 caracteres.');
+            setLoading(false);
+            return;
+        }
 
         try {
-            const { error } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        full_name: name,
-                    }
-                }
+            // Call the backend API to create the user with profile
+            const response = await fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email,
+                    password,
+                    name,
+                }),
             });
 
-            if (error) {
-                setError(error.message);
+            const data = await response.json();
+
+            if (!response.ok) {
+                setError(data.error || 'Erro ao criar conta. Tente novamente.');
             } else {
-                // Em produção, aqui você mostraria uma mensagem "Verifique seu e-mail para confirmar"
                 alert('Cadastro realizado com sucesso! Faça o login para continuar.');
                 router.push('/login-usuario');
             }
-        } catch {
+        } catch (err) {
             setError('Erro ao criar conta. Tente novamente.');
+            console.error('Signup error:', err);
         } finally {
             setLoading(false);
         }

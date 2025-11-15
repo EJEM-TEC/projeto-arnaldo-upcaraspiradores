@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
+import { useBalance } from '@/hooks/useBalance';
 import LateralMenu from '@/components/LateralMenu';
 import MobileNavbar from '@/components/mobile/MobileNavbar';
 import HomePage from '@/components/mobile/HomePage';
@@ -24,10 +25,9 @@ type MobileView = 'home' | 'balance' | 'add-credit' | 'pix' | 'credit-card' | 'm
 
 export default function MobileDashboard() {
     const [currentView, setCurrentView] = useState<MobileView>('add-credit');
-    const [balance, setBalance] = useState('0,00');
     const [user, setUser] = useState<User | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const [appLoading, setAppLoading] = useState(true);
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [paymentData, setPaymentData] = useState<{
         amount: string;
@@ -38,21 +38,8 @@ export default function MobileDashboard() {
     } | null>(null);
     const router = useRouter();
 
-    // Load balance from database
-    const loadBalance = async (userId: string) => {
-        try {
-            const response = await fetch(`/api/machine/get-balance?userId=${userId}`);
-            if (response.ok) {
-                const data = await response.json();
-                const balanceValue = data.balance || 0;
-                const formattedBalance = balanceValue.toFixed(2).replace('.', ',');
-                setBalance(formattedBalance);
-            }
-        } catch (error) {
-            console.error('Error loading balance:', error);
-            setBalance('0,00');
-        }
-    };
+    // Usar o hook useBalance para atualizar o saldo em tempo real
+    const { balance, loading: balanceLoading } = useBalance(user?.id || null);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -73,30 +60,19 @@ export default function MobileDashboard() {
                 }
 
                 setUser(user);
-                loadBalance(user.id);
-                setLoading(false);
-                
-                // Iniciar polling para este usuário
-                const intervalId = setInterval(() => loadBalance(user.id), 2000);
-                return () => clearInterval(intervalId);
+                setAppLoading(false);
             } else {
                 setUser(session.user);
-                loadBalance(session.user.id);
-                setLoading(false);
-                
-                // Iniciar polling para este usuário
-                const intervalId = setInterval(() => loadBalance(session.user.id), 2000);
-                return () => clearInterval(intervalId);
+                setAppLoading(false);
             }
         };
 
-        const cleanupAuth = checkAuth();
+        checkAuth();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
                 setUser(session.user);
-                loadBalance(session.user.id);
-                setLoading(false);
+                setAppLoading(false);
             } else {
                 router.push('/login-usuario');
             }
@@ -104,9 +80,6 @@ export default function MobileDashboard() {
 
         return () => {
             subscription.unsubscribe();
-            if (cleanupAuth instanceof Function) {
-                cleanupAuth();
-            }
         };
     }, [router]);
 
@@ -145,7 +118,7 @@ export default function MobileDashboard() {
         if (!user) return;
 
         try {
-            setLoading(true);
+            setAppLoading(true);
             
             // Chama a API para ativar a máquina (máquina 1 por padrão)
             const response = await fetch('/api/machine/activate', {
@@ -163,18 +136,16 @@ export default function MobileDashboard() {
             if (!response.ok) {
                 const errorData = await response.json();
                 alert(`Erro: ${errorData.error}`);
-                setLoading(false);
-                // Recarrega o saldo em caso de erro
-                loadBalance(user.id);
+                setAppLoading(false);
+                // O hook useBalance vai atualizar o saldo automaticamente
                 return;
             }
 
             const data = await response.json();
             console.log('Machine activated:', data);
 
-            // Recarrega o saldo
-            loadBalance(user.id);
-            setLoading(false);
+            // O hook useBalance vai atualizar o saldo automaticamente via realtime
+            setAppLoading(false);
 
             // Inicia o countdown
             let remainingSeconds = durationMinutes * 60;
@@ -208,7 +179,7 @@ export default function MobileDashboard() {
         } catch (error) {
             console.error('Error activating machine:', error);
             alert('Erro ao ativar a máquina');
-            setLoading(false);
+            setAppLoading(false);
         }
     };
 
@@ -263,8 +234,10 @@ export default function MobileDashboard() {
     };
 
     const handleCheckoutSuccess = () => {
-        // Recarrega a página para atualizar o saldo
-        window.location.reload();
+        // O hook useBalance vai atualizar o saldo automaticamente via realtime
+        // Não precisa fazer reload da página
+        setShowCheckoutModal(false);
+        setCurrentView('home');
     };
 
     const menuItems = [
@@ -277,7 +250,7 @@ export default function MobileDashboard() {
         { icon: '📄', text: 'Política de Privacidade', action: () => setCurrentView('privacy') },
     ];
 
-    if (loading) {
+    if (appLoading || balanceLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-black px-4">
                 <div className="text-center">
