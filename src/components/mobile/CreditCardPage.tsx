@@ -124,15 +124,15 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                         popupIntervalRef.current = null;
                     }
                     setLoading(false);
-                    
+
                     // Aguarda um pouco para o webhook processar
                     // Em produção, você pode implementar polling para verificar o status
                     setTimeout(() => {
                         // O webhook processará o pagamento e atualizará o banco de dados
                         // Por enquanto, assumimos sucesso e redirecionamos
                         // Em produção, você pode verificar o status via API
-                onNext({
-                    amount: selectedAmount,
+                        onNext({
+                            amount: selectedAmount,
                         });
                     }, 2000);
                 }
@@ -149,12 +149,12 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                             popupIntervalRef.current = null;
                         }
                         setLoading(false);
-                        
+
                         if (event.data.status === 'approved' || event.data.status === 'success') {
                             onNext({
                                 amount: selectedAmount,
-                });
-            } else {
+                            });
+                        } else {
                             setError('Pagamento não aprovado. Tente novamente.');
                         }
                         window.removeEventListener('message', handlePopupMessage);
@@ -226,7 +226,7 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                                 setError(''); // Limpa erro ao mudar valor
                             }}
                             disabled={loading}
-                            className={`w-full h-16 rounded-full font-bold text-lg transition-colors ${selectedAmount === amount
+                            className={`w-full h-30 rounded-full font-bold text-lg transition-colors ${selectedAmount === amount
                                 ? 'bg-orange-500 text-white'
                                 : 'bg-white text-black hover:bg-gray-200'
                                 } disabled:opacity-50`}
@@ -250,48 +250,48 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                 <p className="text-white text-sm mb-4 text-center">
                     Você será redirecionado para o checkout seguro do Mercado Pago para finalizar o pagamento.
                 </p>
-                </div>
+            </div>
 
-                {/* CPF */}
+            {/* CPF */}
             <div className="mb-6">
-                    <label className="block text-white text-sm font-medium mb-2">
-                        CPF
-                    </label>
-                    <input
-                        type="text"
+                <label className="block text-white text-sm font-medium mb-2">
+                    CPF
+                </label>
+                <input
+                    type="text"
                     value={cpf}
-                        onChange={(e) => {
-                            const formatted = formatCPF(e.target.value);
+                    onChange={(e) => {
+                        const formatted = formatCPF(e.target.value);
                         setCpf(formatted);
-                            setError('');
-                        }}
-                        placeholder="000.000.000-00"
-                        maxLength={14}
-                        disabled={loading}
-                        className="w-full h-12 px-4 rounded-lg bg-white text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
-                        required
-                    />
-                </div>
+                        setError('');
+                    }}
+                    placeholder="000.000.000-00"
+                    maxLength={14}
+                    disabled={loading}
+                    className="w-full h-12 px-4 rounded-lg bg-white text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+                    required
+                />
+            </div>
 
-                {/* Mensagem de Erro */}
-                {error && (
+            {/* Mensagem de Erro */}
+            {error && (
                 <div className="mt-4 p-4 bg-red-500 text-white rounded-lg text-sm mb-4">
-                        {error}
-                    </div>
-                )}
+                    {error}
+                </div>
+            )}
 
-                {/* Botão de Pagar */}
-                <button
+            {/* Botão de Pagar */}
+            <button
                 type="button"
                 onClick={handleCheckoutPro}
-                    disabled={loading}
-                    className={`w-full h-14 rounded-full font-bold text-lg transition-colors mt-6 ${loading
-                        ? 'bg-gray-500 text-white cursor-not-allowed'
-                        : 'bg-orange-500 text-white hover:bg-orange-600'
-                        } disabled:opacity-50`}
-                >
+                disabled={loading}
+                className={`w-full h-14 rounded-full font-bold text-lg transition-colors mt-6 ${loading
+                    ? 'bg-gray-500 text-white cursor-not-allowed'
+                    : 'bg-orange-500 text-white hover:bg-orange-600'
+                    } disabled:opacity-50`}
+            >
                 {loading ? 'Abrindo checkout...' : `PAGAR R$ ${selectedAmount}`}
-                </button>
+            </button>
 
             {/* Secure Purchase Badge */}
             <div className="flex items-center justify-center space-x-2 mt-8">

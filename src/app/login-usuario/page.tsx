@@ -17,7 +17,7 @@ export default function MobileLoginPage() {
             // Verifica se há erro na URL (vindo do callback do OAuth)
             const urlParams = new URLSearchParams(window.location.search);
             const errorParam = urlParams.get('error');
-            
+
             if (errorParam) {
                 if (errorParam === 'auth_failed') {
                     setError('Erro ao autenticar. Tente novamente.');
@@ -100,7 +100,7 @@ export default function MobileLoginPage() {
                 <h2 className="text-white text-2xl font-semibold text-center mb-6">Conta Google</h2>
                 <button
                     onClick={handleGoogleLogin}
-                    className="w-full bg-white rounded-xl p-4 flex items-center justify-center gap-3 shadow-lg"
+                    className="w-full bg-white rounded-4xl p-4 flex items-center justify-center gap-3 shadow-lg"
                 >
                     <svg className="w-5 h-5" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -115,7 +115,7 @@ export default function MobileLoginPage() {
             {/* Separator */}
             <div className="flex items-center mb-8">
                 <div className="flex-1 h-px bg-gray-600"></div>
-                <span className="px-4 text-white text-sm">OU</span>
+                <span className="px-4 text-white text-sm italic">OU</span>
                 <div className="flex-1 h-px bg-gray-600"></div>
             </div>
 
@@ -135,7 +135,7 @@ export default function MobileLoginPage() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        className="w-full px-4 py-4 bg-white border border-gray-700 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-base"
+                        className="w-full max-w-xs mx-auto block px-4 py-4 bg-white border border-gray-700 rounded-md text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-base"
                         placeholder="E-mail"
                     />
                     <input
@@ -143,14 +143,15 @@ export default function MobileLoginPage() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        className="w-full px-4 py-4 bg-white border border-gray-700 rounded-xl text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-base"
+                        className="w-full max-w-xs mx-auto block px-4 py-4 bg-white border border-gray-700 rounded-md text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-base"
                         placeholder="Senha"
                     />
 
-                    <div className="text-right">
+                    <div className="text-right pr-8 pb-4 italic">
                         <button
                             type="button"
-                            className="text-gray-400 text-sm hover:text-orange-500 transition-colors"
+                            className="text-gray-400 font-bold text-sm hover:text-orange-500 transition-colors"
+                            onClick={() => router.push('/esqueci_senha')}
                         >
                             Recuperar senha
                         </button>
@@ -159,7 +160,7 @@ export default function MobileLoginPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-orange-500 text-white py-4 rounded-xl font-semibold text-base hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full max-w-1/2 mx-auto block bg-orange-500 text-white py-4 rounded-md font-semibold text-base hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {loading ? 'Carregando...' : 'ENTRAR'}
                     </button>
@@ -167,7 +168,7 @@ export default function MobileLoginPage() {
                     <button
                         type="button"
                         onClick={() => router.push('/signup-usuario')}
-                        className="w-full bg-orange-500 text-white py-4 rounded-xl font-semibold text-base hover:bg-orange-600 transition-colors"
+                        className="w-full max-w-3xs mx-auto block bg-orange-500 text-white py-4 rounded-md font-semibold text-base hover:bg-orange-600 transition-colors"
                     >
                         NOVO CADASTRO
                     </button>

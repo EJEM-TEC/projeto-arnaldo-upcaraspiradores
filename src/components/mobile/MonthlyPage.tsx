@@ -21,6 +21,9 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
     const { user } = useAuth();
     const amounts = ['5', '10', '20', '30', '40', '50'];
 
+    const today = new Date();
+    const day = today.getDate();
+
     const handleAdd = async () => {
         if (!cardNumber || !cvv || !cardholderName || !month || !year || !cpf) {
             setError('Por favor, preencha todos os campos');
@@ -128,7 +131,7 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
             {/* Amount Selection */}
             <div className="mb-8">
                 <p className="text-white text-lg mb-6 text-center">
-                    Selecione abaixo quanto será adicionado ao seu crédito mensalmente (Dia: 15):
+                    Selecione abaixo quanto será adicionado ao seu crédito mensalmente (Dia: {day}):
                 </p>
 
                 <div className="grid grid-cols-3 gap-4 mb-8">
@@ -136,7 +139,7 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
                         <button
                             key={amount}
                             onClick={() => setSelectedAmount(amount)}
-                            className={`w-full h-16 rounded-full font-bold text-lg transition-colors ${selectedAmount === amount
+                            className={`w-full h-30 rounded-full font-bold text-lg transition-colors ${selectedAmount === amount
                                 ? 'bg-orange-500 text-white'
                                 : 'bg-white text-black hover:bg-gray-200'
                                 }`}
