@@ -19,6 +19,7 @@ import HistoryPage from '@/components/mobile/HistoryPage';
 import SupportPage from '@/components/mobile/SupportPage';
 import TermsPage from '@/components/mobile/TermsPage';
 import PrivacyPage from '@/components/mobile/PrivacyPage';
+import WelcomePage from '@/components/mobile/WelcomePage';
 import CheckoutProModal from '@/components/CheckoutProModal';
 
 type MobileView = 'home' | 'balance' | 'add-credit' | 'pix' | 'credit-card' | 'monthly' | 'pix-code' | 'timer' | 'history' | 'support' | 'terms' | 'privacy';
@@ -29,6 +30,7 @@ export default function MobileDashboard() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [appLoading, setAppLoading] = useState(true);
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+    const [showWelcome, setShowWelcome] = useState(false);
     const [paymentData, setPaymentData] = useState<{
         amount: string;
         cpf?: string;
@@ -61,9 +63,21 @@ export default function MobileDashboard() {
 
                 setUser(user);
                 setAppLoading(false);
+                // Mostrar boas-vindas na primeira visita
+                const hasSeenWelcome = localStorage.getItem(`welcome_${user.id}`);
+                if (!hasSeenWelcome) {
+                    setShowWelcome(true);
+                    localStorage.setItem(`welcome_${user.id}`, 'true');
+                }
             } else {
                 setUser(session.user);
                 setAppLoading(false);
+                // Mostrar boas-vindas na primeira visita
+                const hasSeenWelcome = localStorage.getItem(`welcome_${session.user.id}`);
+                if (!hasSeenWelcome) {
+                    setShowWelcome(true);
+                    localStorage.setItem(`welcome_${session.user.id}`, 'true');
+                }
             }
         };
 
@@ -73,6 +87,12 @@ export default function MobileDashboard() {
             if (session?.user) {
                 setUser(session.user);
                 setAppLoading(false);
+                // Mostrar boas-vindas na primeira visita
+                const hasSeenWelcome = localStorage.getItem(`welcome_${session.user.id}`);
+                if (!hasSeenWelcome) {
+                    setShowWelcome(true);
+                    localStorage.setItem(`welcome_${session.user.id}`, 'true');
+                }
             } else {
                 router.push('/login-usuario');
             }
@@ -263,6 +283,14 @@ export default function MobileDashboard() {
 
     return (
         <div className="min-h-screen bg-black relative">
+            {/* Welcome Modal */}
+            {showWelcome && (
+                <WelcomePage 
+                    onClose={() => setShowWelcome(false)}
+                    autoCloseDelay={5000}
+                />
+            )}
+
             {/* Checkout Pro Modal */}
             <CheckoutProModal
                 isOpen={showCheckoutModal}
