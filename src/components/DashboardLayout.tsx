@@ -37,14 +37,15 @@ export default function DashboardLayout({ children, subtitle }: DashboardLayoutP
       <div className={`bg-black text-white transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-21'}`}>
         <div className="p-4">
           {/* Logo/Brand */}
-          <div className="flex items-center mb-8">
+          <div className="flex items-center justify-center mb-8">
             <Image 
               src="/upcar_preto.png" 
               alt="Logo" 
-              width={50} 
-              height={50}
-              className="cursor-pointer mx-auto"
-              onClick={() => router.push('/')} 
+              width={120} 
+              height={120}
+              className="cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => router.push('/')}
+              priority
             />
           </div>
 
