@@ -18,15 +18,17 @@ import HistoryPage from '@/components/mobile/HistoryPage';
 import SupportPage from '@/components/mobile/SupportPage';
 import TermsPage from '@/components/mobile/TermsPage';
 import PrivacyPage from '@/components/mobile/PrivacyPage';
+import CheckoutProModal from '@/components/CheckoutProModal';
 
 type MobileView = 'home' | 'balance' | 'add-credit' | 'pix' | 'credit-card' | 'monthly' | 'pix-code' | 'timer' | 'history' | 'support' | 'terms' | 'privacy';
 
 export default function MobileDashboard() {
     const [currentView, setCurrentView] = useState<MobileView>('add-credit');
-    const [balance] = useState('0,00');
+    const [balance, setBalance] = useState('0,00');
     const [user, setUser] = useState<User | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [paymentData, setPaymentData] = useState<{
         amount: string;
         cpf?: string;
@@ -36,9 +38,24 @@ export default function MobileDashboard() {
     } | null>(null);
     const router = useRouter();
 
+    // Load balance from database
+    const loadBalance = async (userId: string) => {
+        try {
+            const response = await fetch(`/api/machine/get-balance?userId=${userId}`);
+            if (response.ok) {
+                const data = await response.json();
+                const balanceValue = data.balance || 0;
+                const formattedBalance = balanceValue.toFixed(2).replace('.', ',');
+                setBalance(formattedBalance);
+            }
+        } catch (error) {
+            console.error('Error loading balance:', error);
+            setBalance('0,00');
+        }
+    };
+
     useEffect(() => {
         const checkAuth = async () => {
-            // Primeiro tenta obter a sessão
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
             if (sessionError) {
@@ -48,7 +65,6 @@ export default function MobileDashboard() {
             }
 
             if (!session || !session.user) {
-                // Se não há sessão, tenta obter o usuário diretamente
                 const { data: { user }, error: userError } = await supabase.auth.getUser();
 
                 if (!user || userError) {
@@ -57,26 +73,41 @@ export default function MobileDashboard() {
                 }
 
                 setUser(user);
+                loadBalance(user.id);
                 setLoading(false);
+                
+                // Iniciar polling para este usuário
+                const intervalId = setInterval(() => loadBalance(user.id), 2000);
+                return () => clearInterval(intervalId);
             } else {
                 setUser(session.user);
+                loadBalance(session.user.id);
                 setLoading(false);
+                
+                // Iniciar polling para este usuário
+                const intervalId = setInterval(() => loadBalance(session.user.id), 2000);
+                return () => clearInterval(intervalId);
             }
         };
 
-        checkAuth();
+        const cleanupAuth = checkAuth();
 
-        // Listener para mudanças de autenticação
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
                 setUser(session.user);
+                loadBalance(session.user.id);
                 setLoading(false);
             } else {
                 router.push('/login-usuario');
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            subscription.unsubscribe();
+            if (cleanupAuth instanceof Function) {
+                cleanupAuth();
+            }
+        };
     }, [router]);
 
     const handlePaymentSelect = (method: string) => {
@@ -109,9 +140,76 @@ export default function MobileDashboard() {
         setCurrentView('timer');
     };
 
-    const handleTimerStart = () => {
-        console.log('Timer started');
-        // Here you would start the vacuum cleaner timer
+    const handleTimerStart = async (durationMinutes: number) => {
+        console.log('Timer started with duration:', durationMinutes);
+        if (!user) return;
+
+        try {
+            setLoading(true);
+            
+            // Chama a API para ativar a máquina (máquina 1 por padrão)
+            const response = await fetch('/api/machine/activate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: user.id,
+                    machineId: 1, // ID padrão da máquina
+                    durationMinutes: durationMinutes
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                alert(`Erro: ${errorData.error}`);
+                setLoading(false);
+                // Recarrega o saldo em caso de erro
+                loadBalance(user.id);
+                return;
+            }
+
+            const data = await response.json();
+            console.log('Machine activated:', data);
+
+            // Recarrega o saldo
+            loadBalance(user.id);
+            setLoading(false);
+
+            // Inicia o countdown
+            let remainingSeconds = durationMinutes * 60;
+            
+            const countdownInterval = setInterval(async () => {
+                remainingSeconds--;
+                
+                if (remainingSeconds <= 0) {
+                    clearInterval(countdownInterval);
+                    
+                    // Desativa a máquina
+                    try {
+                        await fetch('/api/machine/deactivate', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                machineId: 1
+                            })
+                        });
+                    } catch (error) {
+                        console.error('Error deactivating machine:', error);
+                    }
+
+                    alert('Tempo de uso expirou! Máquina desativada.');
+                    setCurrentView('home');
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error('Error activating machine:', error);
+            alert('Erro ao ativar a máquina');
+            setLoading(false);
+        }
     };
 
     const renderContent = () => {
@@ -119,7 +217,7 @@ export default function MobileDashboard() {
             case 'home':
                 return <HomePage />;
             case 'balance':
-                return <BalancePage balance={balance} />;
+                return <BalancePage balance={balance} onAddCredit={() => setShowCheckoutModal(true)} />;
             case 'add-credit':
                 return <AddCreditPage onPaymentSelect={handlePaymentSelect} />;
             case 'pix':
@@ -159,10 +257,20 @@ export default function MobileDashboard() {
         setIsMenuOpen(false);
     };
 
+    const handleBalanceClick = () => {
+        setShowCheckoutModal(true);
+        setIsMenuOpen(false);
+    };
+
+    const handleCheckoutSuccess = () => {
+        // Recarrega a página para atualizar o saldo
+        window.location.reload();
+    };
+
     const menuItems = [
         { icon: '🏠', text: 'Home', action: () => setCurrentView('home') },
-        { icon: '💰', text: `Meu saldo: R$ ${balance}`, action: () => setCurrentView('balance') },
-        { icon: '➕', text: 'Adicionar crédito', action: () => setCurrentView('add-credit') },
+        { icon: '💰', text: `Meu saldo: R$ ${balance}`, action: handleBalanceClick },
+        { icon: '➕', text: 'Adicionar crédito', action: handleBalanceClick },
         { icon: '🔄', text: 'Histórico', action: () => setCurrentView('history') },
         { icon: '❓', text: 'Suporte', action: () => setCurrentView('support') },
         { icon: '📄', text: 'Termos e Condições', action: () => setCurrentView('terms') },
@@ -182,6 +290,13 @@ export default function MobileDashboard() {
 
     return (
         <div className="min-h-screen bg-black relative">
+            {/* Checkout Pro Modal */}
+            <CheckoutProModal
+                isOpen={showCheckoutModal}
+                onClose={() => setShowCheckoutModal(false)}
+                onSuccess={handleCheckoutSuccess}
+            />
+
             {/* Lateral Menu */}
             <LateralMenu
                 isOpen={isMenuOpen}
@@ -214,7 +329,7 @@ export default function MobileDashboard() {
 
                         {/* Add Balance Button */}
                         <button
-                            onClick={() => setCurrentView('add-credit')}
+                            onClick={() => setShowCheckoutModal(true)}
                             className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center mx-auto hover:bg-orange-600 transition-colors"
                         >
                             <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

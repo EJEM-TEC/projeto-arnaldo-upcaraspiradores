@@ -40,7 +40,44 @@ export async function createUserProfile(user: {
     return { data: null, error };
   }
 
+  // Cria o perfil na tabela profiles com saldo 0
+  await ensureProfileExists(user.id);
+
   return { data, error: null };
+}
+
+// Garante que o perfil existe na tabela profiles com saldo 0
+export async function ensureProfileExists(userId: string) {
+  // Verifica se o perfil já existe
+  const { data: existingProfile, error: checkError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  // Se não existe, cria com saldo 0
+  if (!existingProfile && (!checkError || checkError.code === 'PGRST116')) {
+    const { error: insertError } = await supabase
+      .from('profiles')
+      .insert([
+        {
+          id: userId,
+          saldo: 0,
+        },
+      ]);
+
+    if (insertError) {
+      // Se o erro for de duplicação, tudo bem (pode ter sido criado entre a verificação e a inserção)
+      if (insertError.code !== '23505') {
+        console.error('Error creating profile:', insertError);
+        return { data: null, error: insertError };
+      }
+    } else {
+      console.log(`Profile created for user ${userId} with saldo 0`);
+    }
+  }
+
+  return { data: { id: userId, saldo: 0 }, error: null };
 }
 
 // Get user profile from database
@@ -98,6 +135,90 @@ export async function getUserRole(userId: string) {
 
   if (error) {
     console.error('Error fetching user role:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
+// Profile balance functions
+// Get user balance from profiles table
+export async function getUserBalance(userId: string) {
+  // Primeiro, garante que o perfil existe
+  await ensureProfileExists(userId);
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('saldo')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    // Se a tabela não existir ou não houver registro, retorna saldo 0
+    if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+      return { data: { saldo: 0 }, error: null };
+    }
+    console.error('Error fetching user balance:', error);
+    return { data: null, error };
+  }
+
+  return { data: data || { saldo: 0 }, error: null };
+}
+
+// Increment user balance (add amount to existing balance)
+export async function incrementUserBalance(userId: string, amount: number) {
+  // Primeiro, busca o saldo atual
+  const { data: currentBalance, error: fetchError } = await getUserBalance(userId);
+  
+  if (fetchError) {
+    console.error('Error fetching current balance:', fetchError);
+    return { data: null, error: fetchError };
+  }
+
+  const currentSaldo = Math.round(currentBalance?.saldo || 0);
+  const amountRounded = Math.round(amount);
+  const newSaldo = Math.round(currentSaldo + amountRounded);
+
+  // Atualiza ou cria o registro na tabela profiles
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert({
+      id: userId,
+      saldo: newSaldo, // Garantido como inteiro
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'id'
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error incrementing user balance:', error);
+    return { data: null, error };
+  }
+
+  console.log(`Balance incremented for user ${userId}: ${currentSaldo} + ${amount} = ${newSaldo}`);
+  return { data, error: null };
+}
+
+// Update user balance (set absolute value)
+export async function updateUserBalance(userId: string, saldo: number) {
+  const saldoInt = Math.round(saldo); // Garante que seja inteiro
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert({
+      id: userId,
+      saldo: saldoInt, // Garantido como inteiro
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'id'
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating user balance:', error);
     return { data: null, error };
   }
 
@@ -632,4 +753,150 @@ export async function getMonthlyBilling(year: number, month: number) {
   const startDate = new Date(year, month - 1, 1).toISOString();
   const endDate = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
   return getBillingData(startDate, endDate);
+}
+
+// Machine command control functions
+// Set machine command to 'on' or 'off'
+export async function setMachineCommand(machineId: number, command: 'on' | 'off') {
+  const { data, error } = await supabase
+    .from('machines')
+    .update({ 
+      command: command,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', machineId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error(`Error setting machine ${machineId} command to ${command}:`, error);
+    return { data: null, error };
+  }
+
+  console.log(`Machine ${machineId} command set to ${command}`);
+  return { data, error: null };
+}
+
+// Get machine command status
+export async function getMachineCommand(machineId: number) {
+  const { data, error } = await supabase
+    .from('machines')
+    .select('command')
+    .eq('id', machineId)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`Error getting machine ${machineId} command:`, error);
+    return { data: null, error };
+  }
+
+  return { data: data?.command || 'off', error: null };
+}
+
+// Decrement user balance (subtract amount from balance)
+export async function decrementUserBalance(userId: string, amount: number) {
+  // Primeiro, busca o saldo atual
+  const { data: currentBalance, error: fetchError } = await getUserBalance(userId);
+  
+  if (fetchError) {
+    console.error('Error fetching current balance:', fetchError);
+    return { data: null, error: fetchError };
+  }
+
+  const currentSaldo = Math.round(currentBalance?.saldo || 0);
+  const amountRounded = Math.round(amount);
+  const newSaldo = Math.max(0, Math.round(currentSaldo - amountRounded)); // Não permite saldo negativo
+
+  // Se saldo é insuficiente, retorna erro
+  if (currentSaldo < amountRounded) {
+    const error = new Error('Saldo insuficiente');
+    console.error(`Insufficient balance for user ${userId}: current=${currentSaldo}, required=${amountRounded}`);
+    return { data: null, error };
+  }
+
+  // Atualiza o saldo na tabela profiles
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      saldo: newSaldo,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error decrementing user balance:', error);
+    return { data: null, error };
+  }
+
+  console.log(`Balance decremented for user ${userId}: ${currentSaldo} - ${amount} = ${newSaldo}`);
+  return { data, error: null };
+}
+
+// Get user activation history (máquinas que o usuário já usou)
+export async function getUserActivationHistory(userId: string, limit: number = 50) {
+  try {
+    const { data, error } = await supabase
+      .from('activation_history')
+      .select(`
+        id,
+        machine_id,
+        started_at,
+        ended_at,
+        duration_minutes,
+        cost,
+        status,
+        machines (
+          id,
+          location
+        )
+      `)
+      .eq('user_id', userId)
+      .order('started_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching user activation history:', error);
+      // Se a coluna user_id não existe, retorna dados vazios (será criada na migração)
+      if (error.message?.includes('column') || error.message?.includes('does not exist')) {
+        return { data: [], error: null };
+      }
+      return { data: null, error };
+    }
+
+    return { data: data || [], error: null };
+  } catch (err) {
+    console.error('Unexpected error fetching user activation history:', err);
+    return { data: null, error: err as Error };
+  }
+}
+
+// Atualiza activation_history com user_id e cost quando a máquina é ativada
+export async function updateActivationHistoryWithUser(
+  activationId: number,
+  userId: string,
+  cost: number
+) {
+  try {
+    const { data, error } = await supabase
+      .from('activation_history')
+      .update({
+        user_id: userId,
+        cost: Math.round(cost),
+      })
+      .eq('id', activationId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating activation history with user:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('Unexpected error updating activation history:', err);
+    return { data: null, error: err as Error };
+  }
 }

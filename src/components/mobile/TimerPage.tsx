@@ -4,12 +4,12 @@ import { useState } from 'react';
 
 interface TimerPageProps {
     amount: string;
-    onStart: () => void;
+    onStart: (durationMinutes: number) => void;
 }
 
 export default function TimerPage({ amount, onStart }: TimerPageProps) {
     const [selectedTime, setSelectedTime] = useState('');
-    const [remainingTime, setRemainingTime] = useState('00:00');
+    const [isLoading, setIsLoading] = useState(false);
 
     const timeOptions = [
         { label: '5 min', value: '5', price: 5 },
@@ -22,14 +22,21 @@ export default function TimerPage({ amount, onStart }: TimerPageProps) {
 
     const handleTimeSelect = (time: string) => {
         setSelectedTime(time);
-        setRemainingTime(`${time}:00`);
     };
 
-    const handleStart = () => {
+    const handleStart = async () => {
         if (selectedTime) {
-            onStart();
+            setIsLoading(true);
+            const durationMinutes = parseInt(selectedTime);
+            await onStart(durationMinutes);
+            // isLoading will be reset when timer starts
         }
     };
+
+    const pricePerMinute = 1;
+    const selectedPrice = selectedTime ? (parseInt(selectedTime) * pricePerMinute) : 0;
+    const balanceNumber = parseFloat(amount.replace(',', '.'));
+    const hasEnoughBalance = balanceNumber >= selectedPrice;
 
     return (
         <div className="px-4 py-6">
@@ -48,7 +55,7 @@ export default function TimerPage({ amount, onStart }: TimerPageProps) {
                 </h2>
 
                 <button className="w-full bg-orange-500 text-white py-4 rounded-lg font-bold text-lg uppercase hover:bg-orange-600 transition-colors mb-6 flex items-center justify-center">
-                    Selecione o tempo
+                    {selectedTime ? `${selectedTime} minutos selecionados` : 'Selecione o tempo'}
                     <svg className="w-6 h-6 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -60,10 +67,11 @@ export default function TimerPage({ amount, onStart }: TimerPageProps) {
                         <button
                             key={option.value}
                             onClick={() => handleTimeSelect(option.value)}
+                            disabled={isLoading}
                             className={`py-3 rounded-lg font-bold text-lg transition-colors ${selectedTime === option.value
                                 ? 'bg-orange-500 text-white'
                                 : 'bg-gray-800 text-white hover:bg-gray-700'
-                                }`}
+                                } disabled:opacity-50`}
                         >
                             {option.label}
                         </button>
@@ -77,33 +85,34 @@ export default function TimerPage({ amount, onStart }: TimerPageProps) {
             {/* Price and Balance */}
             <div className="text-center mb-8">
                 <p className="text-white text-xl font-bold mb-2">
-                    PREÇO: R$ {selectedTime ? (parseInt(selectedTime) * 1).toFixed(2).replace('.', ',') : '00,00'}
+                    PREÇO: R$ {selectedPrice.toFixed(2).replace('.', ',')}
                 </p>
-                <p className="text-white text-xl font-bold">
+                <p className={`text-xl font-bold ${hasEnoughBalance ? 'text-white' : 'text-red-500'}`}>
                     MEU SALDO: R$ {amount}
                 </p>
+                {!hasEnoughBalance && selectedTime && (
+                    <p className="text-red-500 text-sm mt-2">
+                        Saldo insuficiente! Faltam R$ {(selectedPrice - balanceNumber).toFixed(2).replace('.', ',')}
+                    </p>
+                )}
             </div>
 
             {/* Separator */}
             <div className="w-full h-px bg-orange-500 mb-8"></div>
 
-            {/* Timer Display */}
-            <div className="text-center mb-8">
-                <h3 className="text-white text-lg font-bold uppercase mb-4">
-                    TEMPO RESTANTE:
-                </h3>
-                <div className="text-white text-6xl font-bold mb-8">
-                    {remainingTime}
-                </div>
+            {/* Info */}
+            <div className="text-center mb-8 text-gray-400 text-sm">
+                <p>O tempo será debitado de seu saldo</p>
+                <p>A máquina será desativada automaticamente ao término</p>
             </div>
 
             {/* Start Button */}
             <button
                 onClick={handleStart}
-                disabled={!selectedTime}
+                disabled={!selectedTime || !hasEnoughBalance || isLoading}
                 className="w-full bg-orange-500 text-white py-4 rounded-lg font-bold text-lg uppercase hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                INICIAR
+                {isLoading ? 'ATIVANDO MÁQUINA...' : 'INICIAR'}
             </button>
         </div>
     );

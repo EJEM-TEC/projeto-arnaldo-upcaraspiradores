@@ -9,9 +9,16 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code');
   const error = requestUrl.searchParams.get('error');
 
+  // Define origin - prefere NEXT_PUBLIC_APP_URL, depois NODE_ENV, depois requestUrl.origin
+  const origin = process.env.NEXT_PUBLIC_APP_URL 
+    ? process.env.NEXT_PUBLIC_APP_URL
+    : (process.env.NODE_ENV === 'production' 
+      ? 'https://www.upaspiradores.com.br' 
+      : requestUrl.origin);
+
   // Se houver um erro (ex: usuário cancelou o login)
   if (error) {
-    return NextResponse.redirect(`${requestUrl.origin}/login-usuario?error=${error}`);
+    return NextResponse.redirect(`${origin}/login-usuario?error=${error}`);
   }
 
   // Se houver um código de autorização na URL, troque-o por uma sessão
@@ -46,13 +53,17 @@ export async function GET(request: NextRequest) {
 
       if (sessionError) {
         console.error('Error exchanging code for session:', sessionError);
-        return NextResponse.redirect(`${requestUrl.origin}/login-usuario?error=auth_failed`);
+        return NextResponse.redirect(`${origin}/login-usuario?error=auth_failed`);
       }
 
       // Obtém o usuário da sessão
       const user = sessionData?.user;
 
+      console.log('User from session:', user?.email, 'ID:', user?.id);
+
       if (user) {
+        console.log('Processing user:', user.email);
+        
         // Verifica se o perfil do usuário já existe na tabela usuarios
         const { data: existingProfile, error: profileError } = await supabase
           .from('usuarios')
@@ -60,14 +71,20 @@ export async function GET(request: NextRequest) {
           .eq('id', user.id)
           .maybeSingle();
 
+        console.log('Existing profile check:', { existingProfile, profileError });
+
         // Se o perfil não existe, cria um novo
         // Se existingProfile for null, significa que não encontrou (normal para novos usuários)
         if (!existingProfile && (!profileError || profileError.code === 'PGRST116')) {
+          console.log('Creating new profile for user:', user.email);
+          
           // Extrai o nome do usuário do metadata do Google
           const fullName = user.user_metadata?.full_name || 
                           user.user_metadata?.name || 
                           user.email?.split('@')[0] || 
                           'Usuário';
+
+          console.log('Full name extracted:', fullName);
 
           // Cria o perfil do usuário
           const { error: insertError } = await supabase
@@ -92,6 +109,24 @@ export async function GET(request: NextRequest) {
           } else {
             console.log('User profile created successfully for:', user.email);
           }
+
+          // Garante que o perfil existe na tabela profiles com saldo 0
+          const { error: createProfileError } = await supabase
+            .from('profiles')
+            .upsert([
+              {
+                id: user.id,
+                saldo: 0,
+              },
+            ], {
+              onConflict: 'id'
+            });
+
+          if (createProfileError) {
+            console.error('Error creating/updating profile:', createProfileError);
+          } else {
+            console.log('Profile created/updated with saldo 0 for:', user.email);
+          }
         } else if (profileError) {
           // Erro diferente de "não encontrado" - pode ser problema
           console.error('Error checking user profile:', profileError);
@@ -101,10 +136,10 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.error('Unexpected error in OAuth callback:', error);
-      return NextResponse.redirect(`${requestUrl.origin}/login-usuario?error=unexpected_error`);
+      return NextResponse.redirect(`${origin}/login-usuario?error=unexpected_error`);
     }
   }
 
   // Redireciona o usuário para a página home (mobile dashboard) após o login
-  return NextResponse.redirect(`${requestUrl.origin}/home`);
+  return NextResponse.redirect(`${origin}/home`);
 }

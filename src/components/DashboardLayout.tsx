@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -37,7 +38,14 @@ export default function DashboardLayout({ children, subtitle }: DashboardLayoutP
         <div className="p-4">
           {/* Logo/Brand */}
           <div className="flex items-center mb-8">
-            <img src="../upcar_preto.png" alt="Logo" className="display: block; margin: 0 auto; cursor-pointer" onClick={() => router.push('/')} />
+            <Image 
+              src="/upcar_preto.png" 
+              alt="Logo" 
+              width={50} 
+              height={50}
+              className="cursor-pointer mx-auto"
+              onClick={() => router.push('/')} 
+            />
           </div>
 
           {/* Toggle Button */}
