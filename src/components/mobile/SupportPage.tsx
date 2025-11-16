@@ -11,8 +11,6 @@ export default function SupportPage() {
                 <div className="bg-gray-800 p-4 rounded-lg">
                     <h3 className="text-white font-semibold mb-2">Contato</h3>
                     <p className="text-gray-400 text-sm mb-2">Email: <a href="mailto:arnaldfirst@gmail.com" className="text-orange-500 hover:text-orange-400">arnaldfirst@gmail.com</a></p>
-                    <p className="text-gray-400 text-sm">Suporte: <a href="mailto:suporte@upcaraspiradores.com" className="text-orange-500 hover:text-orange-400">suporte@upcaraspiradores.com</a></p>
-                    <p className="text-gray-400 text-sm">Telefone: (11) 99999-9999</p>
                 </div>
 
                 <div className="bg-gray-800 p-4 rounded-lg">
