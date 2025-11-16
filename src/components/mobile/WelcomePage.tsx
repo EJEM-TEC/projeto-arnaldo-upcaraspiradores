@@ -11,6 +11,13 @@ interface WelcomePageProps {
 export default function WelcomePage({ onClose, autoCloseDelay = 5000 }: WelcomePageProps) {
     const [isClosing, setIsClosing] = useState(false);
 
+    const handleClose = () => {
+        setIsClosing(true);
+        setTimeout(() => {
+            onClose?.();
+        }, 300);
+    };
+
     useEffect(() => {
         if (autoCloseDelay > 0) {
             const timer = setTimeout(() => {
@@ -18,14 +25,7 @@ export default function WelcomePage({ onClose, autoCloseDelay = 5000 }: WelcomeP
             }, autoCloseDelay);
             return () => clearTimeout(timer);
         }
-    }, [autoCloseDelay]);
-
-    const handleClose = () => {
-        setIsClosing(true);
-        setTimeout(() => {
-            onClose?.();
-        }, 300);
-    };
+    }, [autoCloseDelay, handleClose]);
 
     return (
         <div
