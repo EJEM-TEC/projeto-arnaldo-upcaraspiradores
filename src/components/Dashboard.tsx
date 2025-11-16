@@ -228,6 +228,9 @@ export default function Dashboard() {
         line: (x1: number, y1: number, x2: number, y2: number) => void;
         addPage: () => void;
         save: (filename: string) => void;
+        setDrawColor: (r: number) => void;
+        setFillColor: (r: number, g: number, b: number) => void;
+        rect: (x: number, y: number, w: number, h: number, style: string) => void;
       };
 
       let jsPdfMod: JsPDFModule;
@@ -245,51 +248,315 @@ export default function Dashboard() {
       const machine = machines.find(m => m.id === machineId);
       const stats = machineStats[machineId];
 
+      // --- CABEÇALHO ---
       let y = 15;
-      doc.setFontSize(16);
-      doc.text(`Relatório da Máquina #${machineId}`, 14, y);
+      doc.setFontSize(18);
+      doc.setDrawColor(25, 118, 210);
+      doc.setFillColor(230, 242, 255);
+      doc.rect(14, y - 5, 182, 12, 'F');
+      doc.text('RELATÓRIO DA MÁQUINA - UpCar Aspiradores', 14, y + 2);
+      y += 20;
+
+      // --- INFORMAÇÕES DA MÁQUINA ---
+      doc.setFontSize(13);
+      doc.setDrawColor(100, 100, 100);
+      doc.text('INFORMAÇÕES DO EQUIPAMENTO', 14, y);
       y += 8;
 
-      doc.setFontSize(12);
-      doc.text(`Localização: ${machine?.location || '-'}`, 14, y); y += 6;
-      doc.text(`Status (Raspberry): ${machine?.status || 'ativo'}`, 14, y); y += 6;
-      doc.text(`Voltagem: ${stats?.voltage ?? '-'}`, 14, y); y += 6;
-      doc.text(`Última limpeza: ${stats?.last_cleaning ? new Date(stats.last_cleaning).toLocaleDateString('pt-BR') : '-'}`, 14, y); y += 6;
-      doc.text(`Total de acionamentos: ${stats?.totalActivations ?? 0}`, 14, y); y += 6;
-      doc.text(`Tempo total de uso: ${(stats?.totalUsageMinutes ?? 0)} min`, 14, y); y += 6;
-      doc.text(`Cadastrada em: ${stats?.created_at ? new Date(stats.created_at).toLocaleDateString('pt-BR') : (machine?.created_at ? new Date(machine.created_at).toLocaleDateString('pt-BR') : '-')}`, 14, y); y += 10;
+      doc.setFontSize(11);
+      doc.text(`ID da Máquina: ${machineId}`, 14, y); y += 6;
+      doc.text(`Cidade: ${machine?.location || '-'}`, 14, y); y += 6;
+      doc.text(`Endereço: ${(machine as any)?.address || '-'}`, 14, y); y += 6;
+      doc.text(`Status: ${machine?.status || 'ativo'}`, 14, y); y += 6;
+      doc.text(`Cadastrada em: ${stats?.created_at ? new Date(stats.created_at).toLocaleDateString('pt-BR') : '-'}`, 14, y); y += 8;
 
-      doc.setFontSize(14);
-      doc.text('Histórico de Acionamentos', 14, y); y += 8;
+      // --- RESUMO DE USO (APIRACAR) ---
+      doc.setFontSize(13);
+      doc.setDrawColor(100, 100, 100);
+      doc.text('RESUMO DE USO', 14, y);
+      y += 8;
 
       doc.setFontSize(11);
-      doc.text('Data/Hora                Comando   Duração   Temp.Média   Status', 14, y); y += 6;
-      doc.setLineWidth(0.1);
-      doc.line(14, y, 196, y); y += 4;
+      const totalMinutes = stats?.totalUsageMinutes ?? 0;
+      const totalHours = Math.floor(totalMinutes / 60);
+      const remainingMinutes = totalMinutes % 60;
+      
+      doc.text(`Total de Acionamentos: ${stats?.totalActivations ?? 0}`, 14, y); y += 6;
+      doc.text(`Tempo Total de Uso: ${totalHours}h ${remainingMinutes}m (${totalMinutes} minutos)`, 14, y); y += 6;
+      doc.text(`Temperatura Média: ${stats?.voltage ? 'OK' : '-'}`, 14, y); y += 6;
+      doc.text(`Última Limpeza: ${stats?.last_cleaning ? new Date(stats.last_cleaning).toLocaleDateString('pt-BR') : '-'}`, 14, y); y += 8;
 
-      const rows = (history || []).slice(0, 200); // limitar para caber
+      // --- HISTÓRICO DE ACIONAMENTOS ---
+      doc.setFontSize(13);
+      doc.setDrawColor(100, 100, 100);
+      doc.text('HISTÓRICO DE ACIONAMENTOS', 14, y);
+      y += 8;
+
+      // Cabeçalho da tabela
+      doc.setFontSize(10);
+      doc.setFillColor(200, 200, 200);
+      doc.setDrawColor(100, 100, 100);
+      
+      const colWidths = [50, 20, 20, 20, 30];
+      const cols = ['Data/Hora', 'Comando', 'Duração', 'Temp.', 'Status'];
+      let xPos = 14;
+      
+      doc.setLineWidth(0.1);
+      for (let i = 0; i < cols.length; i++) {
+        doc.rect(xPos, y - 5, colWidths[i], 6, 'F');
+        doc.text(cols[i], xPos + 2, y, { maxWidth: colWidths[i] - 4 });
+        xPos += colWidths[i];
+      }
+      
+      y += 8;
+      doc.setFillColor(255, 255, 255);
+
+      const rows = (history || []).slice(0, 200);
       for (const item of rows) {
-        const start = item.started_at ? new Date(item.started_at).toLocaleString('pt-BR') : '-';
-        const cmd = item.command || '-';
+        if (y > 270) {
+          doc.addPage();
+          y = 15;
+        }
+
+        const start = item.started_at ? new Date(item.started_at).toLocaleString('pt-BR', { 
+          month: '2-digit', 
+          day: '2-digit', 
+          year: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        }) : '-';
+        const cmd = item.command === 'on' ? 'Ligado' : item.command === 'off' ? 'Desligado' : item.command || '-';
         const dur = item.duration_minutes != null ? `${item.duration_minutes}m` : '-';
         const temp = item.average_temperature != null ? `${Number(item.average_temperature).toFixed(1)}°C` : '-';
         const st = item.status || '-';
 
-        const line = `${start.padEnd(22)} ${cmd.padEnd(8)} ${String(dur).padEnd(8)} ${String(temp).padEnd(11)} ${st}`;
-        doc.text(line, 14, y);
-        y += 6;
-
-        if (y > 280) {
-          doc.addPage();
-          y = 15;
+        xPos = 14;
+        const rowData = [start, cmd, dur, temp, st];
+        for (let i = 0; i < rowData.length; i++) {
+          doc.text(rowData[i], xPos + 2, y, { maxWidth: colWidths[i] - 4 });
+          xPos += colWidths[i];
         }
+        y += 6;
       }
 
-      doc.save(`maquina_${machineId}.pdf`);
+      // Rodapé
+      y += 10;
+      doc.setFontSize(9);
+      doc.setDrawColor(150, 150, 150);
+      doc.line(14, y, 196, y);
+      y += 4;
+      doc.text(`Relatório gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, y);
+      doc.text('UpCar Aspiradores - Sistema de Gestão', 155, y);
+
+      doc.save(`relatorio_maquina_${machineId}.pdf`);
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       alert('Não foi possível gerar o PDF. Verifique se as dependências estão instaladas.');
     }
+  };
+
+  const handleDownloadRepaymentPdf = async (machineId: number) => {
+    try {
+      const { getActivationHistoryByMachine } = await import('@/lib/database');
+      const { data: history } = await getActivationHistoryByMachine(machineId);
+
+      type JsPDFModule = {
+        default?: {
+          new (): JsPDFInstance;
+        };
+        new (): JsPDFInstance;
+      };
+      
+      type JsPDFInstance = {
+        setFontSize: (size: number) => void;
+        text: (text: string, x: number, y: number, opts?: any) => void;
+        setLineWidth: (width: number) => void;
+        line: (x1: number, y1: number, x2: number, y2: number) => void;
+        addPage: () => void;
+        save: (filename: string) => void;
+        setDrawColor: (r: number, g?: number, b?: number) => void;
+        setFillColor: (r: number, g?: number, b?: number) => void;
+        rect: (x: number, y: number, w: number, h: number, style: string) => void;
+      };
+
+      let jsPdfMod: JsPDFModule;
+      try {
+        jsPdfMod = (await import('jspdf') as unknown) as JsPDFModule;
+      } catch {
+        alert('Biblioteca jsPDF não encontrada. Execute: npm install jspdf');
+        return;
+      }
+
+      const JsPDFClass = (jsPdfMod.default || jsPdfMod) as new () => JsPDFInstance;
+      const jsPDF = JsPDFClass;
+      const doc = new jsPDF();
+
+      const machine = machines.find(m => m.id === machineId);
+      const stats = machineStats[machineId];
+
+      // --- CABEÇALHO ---
+      let y = 15;
+      doc.setFontSize(18);
+      doc.setDrawColor(220, 100, 0);
+      doc.setFillColor(255, 240, 220);
+      doc.rect(14, y - 5, 182, 12, 'F');
+      doc.text('REPASSE DE SERVIÇOS - UpCar Aspiradores', 14, y + 2);
+      y += 20;
+
+      // --- PERÍODO ---
+      doc.setFontSize(11);
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      doc.text(`Período: ${monthStart.toLocaleDateString('pt-BR')} a ${monthEnd.toLocaleDateString('pt-BR')}`, 14, y);
+      y += 8;
+
+      // --- INFORMAÇÕES DO EQUIPAMENTO ---
+      doc.setFontSize(13);
+      doc.setDrawColor(100, 100, 100);
+      doc.text('INFORMAÇÕES DO EQUIPAMENTO', 14, y);
+      y += 8;
+
+      doc.setFontSize(11);
+      doc.text(`ID da Máquina: ${machineId}`, 14, y); y += 6;
+      doc.text(`Cidade: ${machine?.location || '-'}`, 14, y); y += 6;
+      doc.text(`Endereço: ${(machine as any)?.address || '-'}`, 14, y); y += 8;
+
+      // --- RESUMO DE USO ---
+      doc.setFontSize(13);
+      doc.setDrawColor(100, 100, 100);
+      doc.text('RESUMO DE USO', 14, y);
+      y += 8;
+
+      doc.setFontSize(11);
+      const totalMinutes = stats?.totalUsageMinutes ?? 0;
+      const totalHours = Math.floor(totalMinutes / 60);
+      const remainingMinutes = totalMinutes % 60;
+      
+      doc.text(`Total de Acionamentos: ${stats?.totalActivations ?? 0}`, 14, y); y += 6;
+      doc.text(`Tempo Total de Uso: ${totalHours}h ${remainingMinutes}m (${totalMinutes} minutos)`, 14, y); y += 8;
+
+      // --- INFORMAÇÕES FINANCEIRAS ---
+      doc.setFontSize(13);
+      doc.setDrawColor(100, 100, 100);
+      doc.text('INFORMAÇÕES FINANCEIRAS', 14, y);
+      y += 8;
+
+      doc.setFontSize(11);
+      const minuteRate = 0.50; // R$ 0.50 por minuto (ajuste conforme necessário)
+      const totalAmount = totalMinutes * minuteRate;
+      const apiracarPercentage = 0.30; // 30% para APIRACAR
+      const apiracarValue = totalAmount * apiracarPercentage;
+      const yourValue = totalAmount * (1 - apiracarPercentage);
+      
+      doc.text(`Tarifa por Minuto: R$ ${minuteRate.toFixed(2)}`, 14, y); y += 6;
+      doc.text(`Total de Minutos: ${totalMinutes}`, 14, y); y += 6;
+      doc.text(`Valor Total: R$ ${totalAmount.toFixed(2)}`, 14, y); y += 6;
+      doc.text(`Valor APIRACAR (30%): R$ ${apiracarValue.toFixed(2)}`, 14, y); y += 6;
+      doc.text(`Seu Repasse (70%): R$ ${yourValue.toFixed(2)}`, 14, y); y += 8;
+
+      // --- HISTÓRICO DETALHADO ---
+      doc.setFontSize(13);
+      doc.setDrawColor(100, 100, 100);
+      doc.text('HISTÓRICO DETALHADO DE ACIONAMENTOS', 14, y);
+      y += 8;
+
+      // Cabeçalho da tabela
+      doc.setFontSize(9);
+      doc.setFillColor(200, 150, 100);
+      doc.setDrawColor(100, 100, 100);
+      
+      const colWidths = [45, 20, 20, 25, 30];
+      const cols = ['Data/Hora', 'Comando', 'Duração', 'Temp.', 'Status'];
+      let xPos = 14;
+      
+      doc.setLineWidth(0.1);
+      for (let i = 0; i < cols.length; i++) {
+        doc.rect(xPos, y - 5, colWidths[i], 6, 'F');
+        doc.text(cols[i], xPos + 2, y, { maxWidth: colWidths[i] - 4 });
+        xPos += colWidths[i];
+      }
+      
+      y += 8;
+      doc.setFillColor(255, 255, 255);
+
+      const rows = (history || []).slice(0, 150);
+      for (const item of rows) {
+        if (y > 270) {
+          doc.addPage();
+          y = 15;
+        }
+
+        const start = item.started_at ? new Date(item.started_at).toLocaleString('pt-BR', { 
+          month: '2-digit', 
+          day: '2-digit', 
+          year: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        }) : '-';
+        const cmd = item.command === 'on' ? 'Ligado' : item.command === 'off' ? 'Desligado' : item.command || '-';
+        const dur = item.duration_minutes != null ? `${item.duration_minutes}m` : '-';
+        const temp = item.average_temperature != null ? `${Number(item.average_temperature).toFixed(1)}°C` : '-';
+        const st = item.status || '-';
+
+        xPos = 14;
+        const rowData = [start, cmd, dur, temp, st];
+        for (let i = 0; i < rowData.length; i++) {
+          doc.text(rowData[i], xPos + 2, y, { maxWidth: colWidths[i] - 4 });
+          xPos += colWidths[i];
+        }
+        y += 6;
+      }
+
+      // Rodapé
+      y += 10;
+      doc.setFontSize(9);
+      doc.setDrawColor(150, 150, 150);
+      doc.line(14, y, 196, y);
+      y += 4;
+      doc.text(`Relatório gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, y);
+      doc.text('UpCar Aspiradores - Sistema de Gestão', 155, y);
+
+      doc.save(`repasse_maquina_${machineId}_${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, '0')}.pdf`);
+    } catch (err) {
+      console.error('Erro ao gerar PDF de repasse:', err);
+      alert('Não foi possível gerar o PDF de repasse. Verifique se as dependências estão instaladas.');
+    }
+  };
+
+  const handleDownloadHistoryData = () => {
+    if (activationHistory.length === 0) {
+      alert('Nenhum dado de histórico para baixar. Filtre dados primeiro.');
+      return;
+    }
+
+    // Criar CSV
+    const headers = ['ID', 'Máquina ID', 'Localização', 'Data/Hora Início', 'Comando', 'Duração (min)', 'Temperatura Média', 'Status'];
+    const rows = activationHistory.map((item) => {
+      const activationWithMachine = item as ActivationHistoryWithMachine;
+      const machineLocation = activationWithMachine.machines?.location || '-';
+      const startDate = item.started_at ? new Date(item.started_at).toLocaleString('pt-BR') : '-';
+      const cmd = item.command === 'on' ? 'Ligado' : item.command === 'off' ? 'Desligado' : item.command || '-';
+      const dur = item.duration_minutes != null ? item.duration_minutes : '-';
+      const temp = item.average_temperature != null ? item.average_temperature.toFixed(1) : '-';
+      const status = item.status || '-';
+
+      return [item.id, item.machine_id, machineLocation, startDate, cmd, dur, temp, status].map(v => `"${v}"`).join(',');
+    });
+
+    const csv = [headers.join(','), ...rows].join('\n');
+    
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `historico_acionamentos_${dateStr}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const renderContent = () => {
@@ -452,7 +719,7 @@ export default function Dashboard() {
         return (
           <>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">Faturamento</h2>
+              <h2 className="text-3xl font-bold text-gray-900">Faturamento e Repasse</h2>
               <select
                 value={billingPeriod}
                 onChange={(e) => setBillingPeriod(e.target.value as 'today' | 'week' | 'month' | 'year')}
@@ -472,7 +739,7 @@ export default function Dashboard() {
               </div>
             ) : billingData ? (
               <>
-                {/* Cards de resumo */}
+                {/* Cards de resumo financeiro */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                   <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 rounded-lg text-white">
                     <h3 className="text-lg font-semibold mb-2">Receita Total</h3>
@@ -500,6 +767,49 @@ export default function Dashboard() {
                     </p>
                     <p className="text-blue-100 text-sm">{periodLabels[billingPeriod]}</p>
                   </div>
+                </div>
+
+                {/* RESUMO DE USO - Tabela com minutagem por equipamento */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">📊 Resumo de Uso por Equipamento</h3>
+                  {machines.length === 0 ? (
+                    <p className="text-gray-500">Nenhum equipamento cadastrado</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Localização</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">Acionamentos</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">Tempo Total</th>
+                            <th className="px-4 py-3 text-right font-semibold text-gray-700">Repasse (70%)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {machines.map((machine) => {
+                            const stats = machineStats[machine.id];
+                            const totalMinutes = stats?.totalUsageMinutes ?? 0;
+                            const totalHours = Math.floor(totalMinutes / 60);
+                            const remainingMinutes = totalMinutes % 60;
+                            const minuteRate = 0.50;
+                            const totalAmount = totalMinutes * minuteRate;
+                            const repaymentValue = totalAmount * 0.70;
+                            
+                            return (
+                              <tr key={machine.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 font-semibold text-gray-900">#{machine.id}</td>
+                                <td className="px-4 py-3 text-gray-700">{machine.location || '-'}</td>
+                                <td className="px-4 py-3 text-center text-gray-700">{stats?.totalActivations ?? 0}</td>
+                                <td className="px-4 py-3 text-center text-gray-700">{totalHours}h {remainingMinutes}m</td>
+                                <td className="px-4 py-3 text-right font-semibold text-green-600">R$ {repaymentValue.toFixed(2)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
                 {/* Estatísticas adicionais */}
@@ -588,17 +898,29 @@ export default function Dashboard() {
       case 'historico_acionamentos':
         return (
           <>
-            <div className="flex flex-col md:flex-row md:items-end md:space-x-4 mb-4 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Data início</label>
-                <input type="date" value={historyStart} onChange={(e) => setHistoryStart(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-md text-gray-900" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Data fim</label>
-                <input type="date" value={historyEnd} onChange={(e) => setHistoryEnd(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-md text-gray-900" />
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">Histórico de Acionamentos</h2>
+            
+            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+              <div className="flex flex-col md:flex-row md:items-end md:space-x-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data início</label>
+                  <input type="date" value={historyStart} onChange={(e) => setHistoryStart(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-md text-gray-900" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data fim</label>
+                  <input type="date" value={historyEnd} onChange={(e) => setHistoryEnd(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-md text-gray-900" />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDownloadHistoryData}
+                    disabled={activationHistory.length === 0}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium"
+                  >
+                    ⬇️ Baixar CSV
+                  </button>
+                </div>
               </div>
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">Histórico de Acionamentos</h2>
             {loadingHistory ? (
               <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto"></div>
@@ -815,12 +1137,18 @@ export default function Dashboard() {
                             {expandedMachines[machine.id] && (
                               <tr>
                                 <td colSpan={5} className="px-6 py-4 bg-gray-50">
-                                  <div className="flex justify-end mb-4">
+                                  <div className="flex justify-end gap-2 mb-4">
                                     <button
                                       onClick={() => handleDownloadMachinePdf(machine.id)}
                                       className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md"
                                     >
-                                      Baixar PDF
+                                      📄 Baixar PDF Equipamento
+                                    </button>
+                                    <button
+                                      onClick={() => handleDownloadRepaymentPdf(machine.id)}
+                                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md"
+                                    >
+                                      💰 Baixar PDF Repasse
                                     </button>
                                   </div>
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

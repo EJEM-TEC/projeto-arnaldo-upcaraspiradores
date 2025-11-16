@@ -12,6 +12,7 @@ interface AddMachineFormProps {
 export function AddMachineForm({ onSuccess }: AddMachineFormProps) {
     const [machineId, setMachineId] = useState('');
     const [location, setLocation] = useState('');
+    const [address, setAddress] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -24,8 +25,8 @@ export function AddMachineForm({ onSuccess }: AddMachineFormProps) {
         setSuccess('');
         setGeneratedSlug('');
 
-        if (!machineId || !location) {
-            setError('ID e Localização são obrigatórios.');
+        if (!machineId || !location || !address) {
+            setError('ID, Localização e Endereço são obrigatórios.');
             setLoading(false);
             return;
         }
@@ -39,12 +40,13 @@ export function AddMachineForm({ onSuccess }: AddMachineFormProps) {
 
         try {
             // O slug é gerado automaticamente pelo trigger no banco de dados
-            // Apenas inserimos ID e localização
+            // Inserimos ID, localização e endereço
             const { data, error: insertError } = await supabase
                 .from('machines')
                 .insert({
                     id: machineNum,
                     location: location,
+                    address: address,
                     status: 'offline',
                     command: 'off'
                 })
@@ -59,6 +61,7 @@ export function AddMachineForm({ onSuccess }: AddMachineFormProps) {
                 setGeneratedSlug(slug);
                 setMachineId('');
                 setLocation('');
+                setAddress('');
                 
                 if (onSuccess) {
                     onSuccess();
@@ -91,13 +94,25 @@ export function AddMachineForm({ onSuccess }: AddMachineFormProps) {
             </div>
 
             <div>
-                <label htmlFor="location" className="block text-sm font-medium mb-1">Localização</label>
+                <label htmlFor="location" className="block text-sm font-medium mb-1">Localização (Cidade)</label>
                 <Input
                     id="location"
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Ex: Shopping Center A"
+                    placeholder="Ex: São Paulo"
+                    required
+                />
+            </div>
+
+            <div>
+                <label htmlFor="address" className="block text-sm font-medium mb-1">Endereço</label>
+                <Input
+                    id="address"
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Ex: Rua das Flores, 123, Centro"
                     required
                 />
             </div>
