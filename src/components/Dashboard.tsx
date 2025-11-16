@@ -1138,19 +1138,7 @@ export default function Dashboard() {
                               <tr>
                                 <td colSpan={5} className="px-6 py-4 bg-gray-50">
                                   <div className="flex justify-end gap-2 mb-4">
-                                    <button
-                                      onClick={() => handleDownloadMachinePdf(machine.id)}
-                                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md"
-                                    >
-                                      📄 Baixar PDF Equipamento
-                                    </button>
-                                    <button
-                                      onClick={() => handleDownloadRepaymentPdf(machine.id)}
-                                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md"
-                                    >
-                                      💰 Baixar PDF Repasse
-                                    </button>
-                                  </div>
+
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="bg-white border border-gray-200 rounded-lg p-4">
                                       <p className="text-sm text-gray-500">Voltagem</p>
