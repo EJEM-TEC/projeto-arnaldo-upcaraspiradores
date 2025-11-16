@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 
 interface WelcomePageProps {
@@ -11,12 +11,12 @@ interface WelcomePageProps {
 export default function WelcomePage({ onClose, autoCloseDelay = 5000 }: WelcomePageProps) {
     const [isClosing, setIsClosing] = useState(false);
 
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         setIsClosing(true);
         setTimeout(() => {
             onClose?.();
         }, 300);
-    };
+    }, [onClose]);
 
     useEffect(() => {
         if (autoCloseDelay > 0) {
