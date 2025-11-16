@@ -1,28 +1,126 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState } from 'react';
+import Link from 'next/link';
 
-export default function Page() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
+export default function HomePage() {
+  const [slug, setSlug] = useState('');
 
-  useEffect(() => {
-    if (!loading) {
-      if (user) {
-        router.push('/painel_de_controle?view=adicionar_credito');
-      } else {
-        router.push('/login-usuario');
-      }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (slug.trim()) {
+      window.location.href = `/${encodeURIComponent(slug.trim())}`;
     }
-  }, [user, loading, router]);
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Carregando...</p>
+    <div className="min-h-screen bg-black text-white flex items-center justify-center px-4">
+      <div className="max-w-2xl w-full">
+        {/* Logo/Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold mb-2">
+            <span className="text-orange-500">UpCar</span>Aspiradores
+          </h1>
+          <p className="text-gray-400 text-lg">Sistema Inteligente de Aspiração</p>
+        </div>
+
+        {/* Main Content */}
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-8">
+          <h2 className="text-2xl font-bold mb-6">Como Usar?</h2>
+
+          {/* Instructions */}
+          <div className="space-y-6 mb-8">
+            <div className="flex gap-4">
+              <div className="text-orange-500 text-2xl font-bold">1</div>
+              <div>
+                <h3 className="font-bold mb-2">Escaneie o QR Code</h3>
+                <p className="text-gray-400">
+                  Use seu smartphone para escanear o QR code disponível na máquina. Você será direcionado automaticamente.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="text-orange-500 text-2xl font-bold">2</div>
+              <div>
+                <h3 className="font-bold mb-2">Ou Acesse Manualmente</h3>
+                <p className="text-gray-400">
+                  Se preferir, digite o identificador da máquina abaixo para acessar.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="text-orange-500 text-2xl font-bold">3</div>
+              <div>
+                <h3 className="font-bold mb-2">Controle a Máquina</h3>
+                <p className="text-gray-400">
+                  Uma vez dentro, você pode ativar a máquina, ver histórico de uso e comprar créditos.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="slug" className="block text-sm font-medium text-gray-400 mb-2">
+                Identificador da Máquina (slug)
+              </label>
+              <input
+                type="text"
+                id="slug"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                placeholder="Ex: salao-principal"
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={!slug.trim()}
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition"
+            >
+              Acessar Máquina
+            </button>
+          </form>
+
+          {/* Examples */}
+          <div className="mt-8 pt-8 border-t border-gray-800">
+            <p className="text-sm text-gray-500 mb-4">Exemplos de URLs válidas:</p>
+            <div className="space-y-2">
+              <Link
+                href="/salao-principal"
+                className="block px-3 py-2 bg-gray-800 rounded hover:bg-gray-700 transition text-sm text-orange-500 hover:text-orange-400"
+              >
+                /salao-principal
+              </Link>
+              <Link
+                href="/entrada-shopping"
+                className="block px-3 py-2 bg-gray-800 rounded hover:bg-gray-700 transition text-sm text-orange-500 hover:text-orange-400"
+              >
+                /entrada-shopping
+              </Link>
+              <Link
+                href="/lavagem-completa"
+                className="block px-3 py-2 bg-gray-800 rounded hover:bg-gray-700 transition text-sm text-orange-500 hover:text-orange-400"
+              >
+                /lavagem-completa
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Info Footer */}
+        <div className="mt-12 text-center text-gray-500 text-sm">
+          <p>
+            Problema ao acessar? Entre em contato com{' '}
+            <a href="mailto:suporte@upcaraspiradores.com" className="text-orange-500 hover:text-orange-400">
+              suporte@upcaraspiradores.com
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );
