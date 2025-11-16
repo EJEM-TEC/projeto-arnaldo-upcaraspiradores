@@ -192,18 +192,17 @@ export default function Dashboard() {
 
     setLoadingClient(true);
     try {
-      const { getUserProfile } = await import('@/lib/database');
-      const { data: user } = await getUserProfile(id);
+      const { getUserFullName } = await import('@/lib/database');
+      const { data: userProfile } = await getUserFullName(id);
       
       // Debug log
-      console.log('Fetched user profile:', { id, user });
+      console.log('Fetched user profile:', { id, userProfile });
       
-      if (user) {
-        const displayName = user.name || user.email || 'Cliente não encontrado';
-        console.log('Setting client name to:', displayName);
-        setClientName(displayName);
+      if (userProfile?.full_name) {
+        console.log('Setting client name to:', userProfile.full_name);
+        setClientName(userProfile.full_name);
       } else {
-        console.warn('User profile not found for ID:', id);
+        console.warn('User full_name not found for ID:', id);
         setClientName('Cliente não encontrado');
       }
     } catch (error) {

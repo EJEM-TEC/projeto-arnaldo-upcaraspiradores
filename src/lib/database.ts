@@ -96,6 +96,22 @@ export async function getUserProfile(userId: string) {
   return { data, error: null };
 }
 
+// Get user full name from profiles table
+export async function getUserFullName(userId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('userid', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching user full name:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
 // Update user profile
 export async function updateUserProfile(userId: string, updates: Partial<usuarios>) {
   const { data } = await supabase
