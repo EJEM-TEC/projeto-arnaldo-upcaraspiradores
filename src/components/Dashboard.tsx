@@ -644,6 +644,240 @@ export default function Dashboard() {
     document.body.removeChild(link);
   };
 
+  const handleDownloadRepaymentReport = async () => {
+    try {
+      if (activationHistory.length === 0) {
+        alert('Nenhum dado de histórico para gerar o PDF. Filtre dados primeiro.');
+        return;
+      }
+
+      type JsPDFModule = {
+        default?: {
+          new (): JsPDFInstance;
+        };
+        new (): JsPDFInstance;
+      };
+      
+      type JsPDFInstance = {
+        setFontSize: (size: number) => void;
+        setTextColor: (r: number, g?: number, b?: number) => void;
+        text: (text: string, x: number, y: number, opts?: Record<string, unknown>) => void;
+        setLineWidth: (width: number) => void;
+        line: (x1: number, y1: number, x2: number, y2: number) => void;
+        addPage: () => void;
+        save: (filename: string) => void;
+        setDrawColor: (r: number, g?: number, b?: number) => void;
+        setFillColor: (r: number, g?: number, b?: number) => void;
+        rect: (x: number, y: number, w: number, h: number, style?: string) => void;
+        getTextWidth: (text: string) => number;
+      };
+
+      let jsPdfMod: JsPDFModule;
+      try {
+        jsPdfMod = (await import('jspdf') as unknown) as JsPDFModule;
+      } catch {
+        alert('Biblioteca jsPDF não encontrada. Execute: npm install jspdf');
+        return;
+      }
+
+      const JsPDFClass = (jsPdfMod.default || jsPdfMod) as new () => JsPDFInstance;
+      const doc = new JsPDFClass();
+
+      // ========== PÁGINA 1: SUMÁRIO ==========
+      let y = 15;
+      
+      // Cabeçalho com marca
+      doc.setFontSize(16);
+      doc.setTextColor(220, 100, 0);
+      doc.text('AspiraCar connect', 14, y);
+      doc.setTextColor(0, 0, 0);
+      y += 12;
+
+      // Título
+      doc.setFontSize(18);
+      doc.setDrawColor(220, 100, 0);
+      doc.setFillColor(255, 240, 220);
+      doc.rect(14, y - 8, 182, 10, 'F');
+      doc.text('RELATÓRIO - FATURAMENTO CONSOLIDADO', 14, y);
+      y += 18;
+
+      // Período
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      doc.setFontSize(11);
+      doc.text(`Período: ${monthStart.toLocaleDateString('pt-BR')} a ${monthEnd.toLocaleDateString('pt-BR')}`, 14, y);
+      y += 12;
+
+      // Calcular resumo consolidado
+      const totalActivations = activationHistory.length;
+      const totalMinutes = activationHistory.reduce((sum, item) => sum + (item.duration_minutes || 0), 0);
+      const totalHours = Math.floor(totalMinutes / 60);
+      const remainingMinutes = totalMinutes % 60;
+      const minuteRate = 0.50;
+      const totalAmount = totalMinutes * minuteRate;
+      const apiracarValue = totalAmount * 0.30;
+      const yourValue = totalAmount * 0.70;
+
+      // Função auxiliar para criar tabelas
+      const createTable = (title: string, rows: Array<[string, string]>, startY: number) => {
+        doc.setFontSize(12);
+        doc.setTextColor(100, 100, 100);
+        doc.text(title, 14, startY);
+        
+        let tableY = startY + 7;
+        const colWidth = 85;
+        
+        // Cabeçalho
+        doc.setFillColor(220, 220, 220);
+        doc.setDrawColor(100, 100, 100);
+        doc.setLineWidth(0.5);
+        doc.rect(14, tableY - 5, colWidth, 6, 'F');
+        doc.rect(14 + colWidth, tableY - 5, colWidth, 6, 'F');
+        
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text('Descrição', 16, tableY);
+        doc.text('Valor', 14 + colWidth + 5, tableY);
+        
+        tableY += 8;
+        
+        // Linhas
+        doc.setDrawColor(150, 150, 150);
+        doc.setLineWidth(0.3);
+        doc.setFillColor(255, 255, 255);
+        doc.setFontSize(9);
+        
+        rows.forEach((row) => {
+          doc.rect(14, tableY - 5, colWidth, 6);
+          doc.rect(14 + colWidth, tableY - 5, colWidth, 6);
+          
+          doc.text(row[0], 16, tableY, { maxWidth: colWidth - 4 });
+          doc.text(row[1], 14 + colWidth + 5, tableY, { maxWidth: colWidth - 4, align: 'right' });
+          tableY += 6;
+        });
+        
+        return tableY + 4;
+      };
+
+      // Tabela: Resumo de Faturamento
+      y = createTable('RESUMO DE FATURAMENTO', [
+        ['Total de Acionamentos', `${totalActivations}`],
+        ['Tempo Total de Uso', `${totalHours}h ${remainingMinutes}m`],
+        ['Total de Minutos', `${totalMinutes}`],
+      ], y);
+
+      y += 4;
+
+      // Tabela: Cálculo de Repasse
+      y = createTable('CÁLCULO DE REPASSE FINANCEIRO', [
+        ['Tarifa por Minuto', `R$ ${minuteRate.toFixed(2)}`],
+        ['Valor Total', `R$ ${totalAmount.toFixed(2)}`],
+        ['Valor APIRACAR (30%)', `R$ ${apiracarValue.toFixed(2)}`],
+        ['Seu Repasse (70%)', `R$ ${yourValue.toFixed(2)}`],
+      ], y);
+
+      // ========== PÁGINAS 2+: HISTÓRICO DE ACIONAMENTOS ==========
+      doc.addPage();
+      y = 15;
+
+      doc.setFontSize(14);
+      doc.setTextColor(0, 0, 0);
+      doc.text('HISTÓRICO DE RECEBIMENTOS', 14, y);
+      y += 12;
+
+      // Configuração da tabela de histórico
+      const rowHeight = 7;
+      const pageHeight = 280;
+      const headerHeight = 8;
+      const margin = 10;
+
+      // Colunas
+      const columns = [
+        { label: 'Data/Hora', width: 35 },
+        { label: 'Máquina', width: 15 },
+        { label: 'Local', width: 25 },
+        { label: 'Comando', width: 15 },
+        { label: 'Duração', width: 20 },
+        { label: 'Status', width: 30 },
+      ];
+
+      const renderTableHeader = (startY: number) => {
+        doc.setFillColor(220, 100, 0);
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8);
+        doc.setLineWidth(0.5);
+        doc.setDrawColor(220, 100, 0);
+
+        let xPos = margin;
+        columns.forEach((col) => {
+          doc.rect(xPos, startY - 4, col.width, headerHeight, 'FD');
+          doc.text(col.label, xPos + 1, startY + 1, { maxWidth: col.width - 2 });
+          xPos += col.width;
+        });
+      };
+
+      const renderTableRow = (rowData: string[], startY: number) => {
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(7);
+        doc.setLineWidth(0.3);
+        doc.setDrawColor(150, 150, 150);
+
+        let xPos = margin;
+        columns.forEach((col, index) => {
+          doc.rect(xPos, startY - 4, col.width, rowHeight);
+          doc.text(rowData[index] || '-', xPos + 1, startY + 1, { maxWidth: col.width - 2 });
+          xPos += col.width;
+        });
+      };
+
+      // Render first header
+      renderTableHeader(y);
+      y += headerHeight + 2;
+
+      // Render rows
+      activationHistory.forEach((item) => {
+        // Verifica se precisa de nova página
+        if (y + rowHeight > pageHeight) {
+          doc.addPage();
+          y = 15;
+          renderTableHeader(y);
+          y += headerHeight + 2;
+        }
+
+        const start = item.started_at
+          ? new Date(item.started_at).toLocaleString('pt-BR', {
+              month: '2-digit',
+              day: '2-digit',
+              year: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-';
+        const machineData = item as ActivationHistoryWithMachine;
+        const machineId = String(item.machine_id || '-');
+        const location = machineData.machines?.location || '-';
+        const cmd = item.command === 'on' ? 'Ligado' : item.command === 'off' ? 'Desligado' : item.command || '-';
+        const dur = item.duration_minutes != null ? `${item.duration_minutes}m` : '-';
+        const st = item.status || '-';
+
+        renderTableRow([start, machineId, location, cmd, dur, st], y);
+        y += rowHeight;
+      });
+
+      // Rodapé na última página
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Relatório gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 285);
+      doc.text('UpCar Aspiradores - Sistema de Gestão', 120, 285);
+
+      doc.save(`repasse_consolidado_${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, '0')}.pdf`);
+    } catch (err) {
+      console.error('Erro ao gerar PDF de repasse consolidado:', err);
+      alert('Não foi possível gerar o PDF. Verifique se as dependências estão instaladas.');
+    }
+  };
+
   const renderContent = () => {
     switch (currentView) {
       case 'adicionar_credito':
@@ -1002,6 +1236,13 @@ export default function Dashboard() {
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium"
                   >
                     ⬇️ Baixar CSV
+                  </button>
+                  <button
+                    onClick={handleDownloadRepaymentReport}
+                    disabled={activationHistory.length === 0}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium"
+                  >
+                    📄 Baixar PDF Repasse
                   </button>
                 </div>
               </div>
