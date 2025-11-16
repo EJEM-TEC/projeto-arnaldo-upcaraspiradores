@@ -911,24 +911,20 @@ export async function updateActivationHistoryWithUser(
  * Gera um slug único a partir da localização e ID da máquina
  * Exemplo: "salao-principal-1"
  */
-export function generateSlug(location: string, machineId: number): string {
-  // Remove espaços e caracteres especiais, converte para lowercase
-  let slug = location
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, ''); // Remove hífens do início/fim
-
-  // Se ficar vazio, usa padrão
-  if (!slug) {
-    slug = 'maquina';
-  }
-
-  // Adiciona o ID para garantir unicidade
-  return `${slug}-${machineId}`;
+/**
+ * Gera um slug numérico aleatório de 6 dígitos
+ * NOTA: No banco de dados, a geração é automática via trigger
+ * Esta função é apenas para referência/teste
+ */
+export function generateRandomSlug(): string {
+  const min = 100000;
+  const max = 999999;
+  const randomNum = Math.floor(Math.random() * (max - min + 1)) + min;
+  return randomNum.toString();
 }
 
 /**
- * Busca uma máquina pelo slug_id
+ * Busca uma máquina pelo slug_id (6 dígitos)
  */
 export async function getMachineBySlug(slugId: string) {
   try {
@@ -951,56 +947,25 @@ export async function getMachineBySlug(slugId: string) {
 }
 
 /**
- * Atualiza o slug_id de uma máquina
+ * Verifica se um slug já existe
  */
-export async function updateMachineSlug(machineId: number, slugId: string) {
+export async function isSlugExists(slugId: string): Promise<boolean> {
   try {
     const { data, error } = await supabase
       .from('machines')
-      .update({ slug_id: slugId })
-      .eq('id', machineId)
-      .select()
+      .select('id', { count: 'exact' })
+      .eq('slug_id', slugId)
       .single();
 
-    if (error) {
-      console.error('Error updating machine slug:', error);
-      return { data: null, error };
-    }
-
-    console.log(`Machine slug updated: ${machineId} -> ${slugId}`);
-    return { data, error: null };
-  } catch (err) {
-    console.error('Unexpected error updating machine slug:', err);
-    return { data: null, error: err as Error };
-  }
-}
-
-/**
- * Valida se um slug é único antes de criar/atualizar
- */
-export async function isSlugUnique(slugId: string, machineId?: number): Promise<boolean> {
-  try {
-    let query = supabase
-      .from('machines')
-      .select('id')
-      .eq('slug_id', slugId);
-
-    // Se machineId foi fornecido, exclui da verificação (permite atualizar a mesma máquina)
-    if (machineId) {
-      query = query.neq('id', machineId);
-    }
-
-    const { data, error } = await query.maybeSingle();
-
-    if (error) {
-      console.error('Error checking slug uniqueness:', error);
+    if (error && error.code !== 'PGRST116') {
+      // PGRST116 = no rows returned (é ok)
+      console.error('Error checking if slug exists:', error);
       return false;
     }
 
-    // Se não encontrou nada, é único
-    return !data;
+    return !!data;
   } catch (err) {
-    console.error('Unexpected error checking slug uniqueness:', err);
+    console.error('Unexpected error checking slug existence:', err);
     return false;
   }
 }

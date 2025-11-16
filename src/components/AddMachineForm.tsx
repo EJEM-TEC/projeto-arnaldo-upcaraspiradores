@@ -2,7 +2,6 @@
 'use client';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { generateSlug } from '@/lib/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '../components/ui/input';
 
@@ -13,45 +12,17 @@ interface AddMachineFormProps {
 export function AddMachineForm({ onSuccess }: AddMachineFormProps) {
     const [machineId, setMachineId] = useState('');
     const [location, setLocation] = useState('');
-    const [generatedSlug, setGeneratedSlug] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-
-    // Gera slug automaticamente ao digitar localização
-    const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newLocation = e.target.value;
-        setLocation(newLocation);
-
-        // Gera preview do slug
-        if (newLocation && machineId) {
-            const machineNum = parseInt(machineId);
-            if (!isNaN(machineNum)) {
-                const slug = generateSlug(newLocation, machineNum);
-                setGeneratedSlug(slug);
-            }
-        }
-    };
-
-    const handleIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newId = e.target.value;
-        setMachineId(newId);
-
-        // Regenera slug quando ID mudar
-        if (newId && location) {
-            const machineNum = parseInt(newId);
-            if (!isNaN(machineNum)) {
-                const slug = generateSlug(location, machineNum);
-                setGeneratedSlug(slug);
-            }
-        }
-    };
+    const [generatedSlug, setGeneratedSlug] = useState('');
 
     async function handleAddMachine(e: React.FormEvent) {
         e.preventDefault();
         setLoading(true);
         setError('');
         setSuccess('');
+        setGeneratedSlug('');
 
         if (!machineId || !location) {
             setError('ID e Localização são obrigatórios.');
@@ -66,46 +37,40 @@ export function AddMachineForm({ onSuccess }: AddMachineFormProps) {
             return;
         }
 
-        const slug = generateSlug(location, machineNum);
+        try {
+            // O slug é gerado automaticamente pelo trigger no banco de dados
+            // Apenas inserimos ID e localização
+            const { data, error: insertError } = await supabase
+                .from('machines')
+                .insert({
+                    id: machineNum,
+                    location: location,
+                    status: 'offline',
+                    command: 'off'
+                })
+                .select()
+                .single();
 
-        // Verifica se o slug já existe
-        const { data: existingMachine, error: checkError } = await supabase
-            .from('machines')
-            .select('id')
-            .eq('slug_id', slug)
-            .maybeSingle();
-
-        if (existingMachine) {
-            setError(`Slug '${slug}' já está em uso. Mude a localização ou ID.`);
-            setLoading(false);
-            return;
-        }
-
-        // Insere a máquina com o slug gerado
-        const { error: insertError } = await supabase
-            .from('machines')
-            .insert({
-                id: machineNum,
-                location: location,
-                slug_id: slug,
-                status: 'offline',
-                command: 'off'
-            });
-
-        if (insertError) {
-            setError(`Erro ao adicionar máquina: ${insertError.message}`);
-        } else {
-            setSuccess(`✅ Máquina adicionada com sucesso! Slug: ${slug}`);
-            setMachineId('');
-            setLocation('');
-            setGeneratedSlug('');
-            
-            if (onSuccess) {
-                onSuccess();
+            if (insertError) {
+                setError(`Erro ao adicionar máquina: ${insertError.message}`);
             } else {
-                setTimeout(() => window.location.reload(), 1500);
+                const slug = data?.slug_id || 'gerado-automaticamente';
+                setSuccess(`✅ Máquina adicionada com sucesso! Slug gerado: ${slug}`);
+                setGeneratedSlug(slug);
+                setMachineId('');
+                setLocation('');
+                
+                if (onSuccess) {
+                    onSuccess();
+                } else {
+                    setTimeout(() => window.location.reload(), 2000);
+                }
             }
+        } catch (err) {
+            console.error('Erro ao adicionar máquina:', err);
+            setError('Erro inesperado ao adicionar máquina.');
         }
+        
         setLoading(false);
     }
 
@@ -119,7 +84,7 @@ export function AddMachineForm({ onSuccess }: AddMachineFormProps) {
                     id="machineId"
                     type="number"
                     value={machineId}
-                    onChange={handleIdChange}
+                    onChange={(e) => setMachineId(e.target.value)}
                     placeholder="Ex: 22027"
                     required
                 />
@@ -131,20 +96,28 @@ export function AddMachineForm({ onSuccess }: AddMachineFormProps) {
                     id="location"
                     type="text"
                     value={location}
-                    onChange={handleLocationChange}
+                    onChange={(e) => setLocation(e.target.value)}
                     placeholder="Ex: Shopping Center A"
                     required
                 />
             </div>
 
-            {/* Preview do slug gerado */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+                <p className="text-gray-700">
+                    ℹ️ <strong>Slug gerado automaticamente</strong>
+                </p>
+                <p className="text-gray-600 text-xs mt-1">
+                    Um código de 6 dígitos será gerado automaticamente ao cadastrar a máquina.
+                </p>
+            </div>
+
             {generatedSlug && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+                <div className="p-3 bg-green-50 border border-green-200 rounded text-sm">
                     <p className="text-gray-700">
-                        <strong>Slug gerado:</strong> <code className="bg-gray-200 px-2 py-1 rounded">{generatedSlug}</code>
+                        ✅ <strong>Slug gerado:</strong> <code className="bg-gray-200 px-2 py-1 rounded text-base font-bold">{generatedSlug}</code>
                     </p>
                     <p className="text-gray-600 text-xs mt-1">
-                        URL de acesso: <code className="bg-gray-200 px-2 py-1 rounded">/maquina/{generatedSlug}</code>
+                        URL de acesso: <code className="bg-gray-200 px-2 py-1 rounded">/{generatedSlug}</code>
                     </p>
                 </div>
             )}

@@ -43,9 +43,9 @@ export default function HomePage() {
             <div className="flex gap-4">
               <div className="text-orange-500 text-2xl font-bold">2</div>
               <div>
-                <h3 className="font-bold mb-2">Ou Acesse Manualmente</h3>
+                <h3 className="font-bold mb-2">Ou Digite o Código da Máquina</h3>
                 <p className="text-gray-400">
-                  Se preferir, digite o identificador da máquina abaixo para acessar.
+                  Se preferir, digite o código de 6 dígitos da máquina abaixo para acessar.
                 </p>
               </div>
             </div>
@@ -65,21 +65,22 @@ export default function HomePage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="slug" className="block text-sm font-medium text-gray-400 mb-2">
-                Identificador da Máquina (slug)
+                Código da Máquina (6 dígitos)
               </label>
               <input
                 type="text"
                 id="slug"
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
-                placeholder="Ex: salao-principal"
+                placeholder="Ex: 123456"
+                maxLength={6}
                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
               />
             </div>
 
             <button
               type="submit"
-              disabled={!slug.trim()}
+              disabled={!slug.trim() || slug.length !== 6}
               className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition"
             >
               Acessar Máquina
@@ -88,25 +89,25 @@ export default function HomePage() {
 
           {/* Examples */}
           <div className="mt-8 pt-8 border-t border-gray-800">
-            <p className="text-sm text-gray-500 mb-4">Exemplos de URLs válidas:</p>
+            <p className="text-sm text-gray-500 mb-4">Exemplos de códigos válidos:</p>
             <div className="space-y-2">
               <Link
-                href="/salao-principal"
+                href="/123456"
                 className="block px-3 py-2 bg-gray-800 rounded hover:bg-gray-700 transition text-sm text-orange-500 hover:text-orange-400"
               >
-                /salao-principal
+                /123456
               </Link>
               <Link
-                href="/entrada-shopping"
+                href="/654321"
                 className="block px-3 py-2 bg-gray-800 rounded hover:bg-gray-700 transition text-sm text-orange-500 hover:text-orange-400"
               >
-                /entrada-shopping
+                /654321
               </Link>
               <Link
-                href="/lavagem-completa"
+                href="/999999"
                 className="block px-3 py-2 bg-gray-800 rounded hover:bg-gray-700 transition text-sm text-orange-500 hover:text-orange-400"
               >
-                /lavagem-completa
+                /999999
               </Link>
             </div>
           </div>
