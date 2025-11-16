@@ -208,7 +208,7 @@ export default function Dashboard() {
     fetchClientName(value);
   };
 
-  const handleDownloadMachinePdf = async (machineId: number) => {
+  const _handleDownloadMachinePdf = async (machineId: number) => {
     try {
       const { getActivationHistoryByMachine } = await import('@/lib/database');
       const { data: history } = await getActivationHistoryByMachine(machineId);
@@ -355,7 +355,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleDownloadRepaymentPdf = async (machineId: number) => {
+  const _handleDownloadRepaymentPdf = async (machineId: number) => {
     try {
       const { getActivationHistoryByMachine } = await import('@/lib/database');
       const { data: history } = await getActivationHistoryByMachine(machineId);
@@ -1137,8 +1137,6 @@ export default function Dashboard() {
                             {expandedMachines[machine.id] && (
                               <tr>
                                 <td colSpan={5} className="px-6 py-4 bg-gray-50">
-                                  <div className="flex justify-end gap-2 mb-4">
-
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="bg-white border border-gray-200 rounded-lg p-4">
                                       <p className="text-sm text-gray-500">Voltagem</p>
@@ -1158,7 +1156,7 @@ export default function Dashboard() {
                                     </div>
                                   </div>
                                 </td>
-                          </tr>
+                              </tr>
                             )}
                           </>
                         );
