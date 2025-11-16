@@ -230,6 +230,8 @@ export interface Machine {
   id: number;
   location?: string;
   status?: string;
+  slug_id?: string;
+  command?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -898,5 +900,107 @@ export async function updateActivationHistoryWithUser(
   } catch (err) {
     console.error('Unexpected error updating activation history:', err);
     return { data: null, error: err as Error };
+  }
+}
+
+// ============================================
+// SLUG FUNCTIONS
+// ============================================
+
+/**
+ * Gera um slug único a partir da localização e ID da máquina
+ * Exemplo: "salao-principal-1"
+ */
+export function generateSlug(location: string, machineId: number): string {
+  // Remove espaços e caracteres especiais, converte para lowercase
+  let slug = location
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, ''); // Remove hífens do início/fim
+
+  // Se ficar vazio, usa padrão
+  if (!slug) {
+    slug = 'maquina';
+  }
+
+  // Adiciona o ID para garantir unicidade
+  return `${slug}-${machineId}`;
+}
+
+/**
+ * Busca uma máquina pelo slug_id
+ */
+export async function getMachineBySlug(slugId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('machines')
+      .select('*')
+      .eq('slug_id', slugId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching machine by slug:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('Unexpected error fetching machine by slug:', err);
+    return { data: null, error: err as Error };
+  }
+}
+
+/**
+ * Atualiza o slug_id de uma máquina
+ */
+export async function updateMachineSlug(machineId: number, slugId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('machines')
+      .update({ slug_id: slugId })
+      .eq('id', machineId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating machine slug:', error);
+      return { data: null, error };
+    }
+
+    console.log(`Machine slug updated: ${machineId} -> ${slugId}`);
+    return { data, error: null };
+  } catch (err) {
+    console.error('Unexpected error updating machine slug:', err);
+    return { data: null, error: err as Error };
+  }
+}
+
+/**
+ * Valida se um slug é único antes de criar/atualizar
+ */
+export async function isSlugUnique(slugId: string, machineId?: number): Promise<boolean> {
+  try {
+    let query = supabase
+      .from('machines')
+      .select('id')
+      .eq('slug_id', slugId);
+
+    // Se machineId foi fornecido, exclui da verificação (permite atualizar a mesma máquina)
+    if (machineId) {
+      query = query.neq('id', machineId);
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error) {
+      console.error('Error checking slug uniqueness:', error);
+      return false;
+    }
+
+    // Se não encontrou nada, é único
+    return !data;
+  } catch (err) {
+    console.error('Unexpected error checking slug uniqueness:', err);
+    return false;
   }
 }
