@@ -266,7 +266,7 @@ export default function Dashboard() {
       doc.setFontSize(11);
       doc.text(`ID da Máquina: ${machineId}`, 14, y); y += 6;
       doc.text(`Cidade: ${machine?.location || '-'}`, 14, y); y += 6;
-      doc.text(`Endereço: ${(machine as any)?.address || '-'}`, 14, y); y += 6;
+      doc.text(`Endereço: ${machine?.address || '-'}`, 14, y); y += 6;
       doc.text(`Status: ${machine?.status || 'ativo'}`, 14, y); y += 6;
       doc.text(`Cadastrada em: ${stats?.created_at ? new Date(stats.created_at).toLocaleDateString('pt-BR') : '-'}`, 14, y); y += 8;
 
@@ -420,7 +420,7 @@ export default function Dashboard() {
       doc.setFontSize(11);
       doc.text(`ID da Máquina: ${machineId}`, 14, y); y += 6;
       doc.text(`Cidade: ${machine?.location || '-'}`, 14, y); y += 6;
-      doc.text(`Endereço: ${(machine as any)?.address || '-'}`, 14, y); y += 8;
+      doc.text(`Endereço: ${machine?.address || '-'}`, 14, y); y += 8;
 
       // --- RESUMO DE USO ---
       doc.setFontSize(13);

@@ -229,6 +229,7 @@ export async function updateUserBalance(userId: string, saldo: number) {
 export interface Machine {
   id: number;
   location?: string;
+  address?: string;
   status?: string;
   slug_id?: string;
   command?: string;
