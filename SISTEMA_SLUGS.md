@@ -1,238 +1,345 @@
-# 🏷️ Sistema de Slugs para Máquinas
+# 🏷️ Sistema de Slugs - Arquitetura com QR Code
 
-## O que é um Slug?
+## 🎯 Conceito Principal
 
-Um **slug** é uma versão URL-friendly (segura para URLs) do nome da máquina. É armazenado no banco de dados para fins de legibilidade e SEO, mas as URLs do sistema continuam usando **IDs numéricos** como identificador principal.
+O **site inteiro** é atrelado a uma **máquina específica via slug**. Quando um usuário escaneia um QR code em uma máquina, o URL inclui o slug_id e o usuário entra automaticamente naquele contexto de máquina.
 
-**Exemplo:**
-- ID da máquina: `22027`
-- URL de acesso: `/maquina/22027`
-- Slug armazenado: `salao-principal-shopping-center` (apenas para referência/legibilidade)
+### Exemplo de Fluxo:
 
-## Como Funciona
+```
+1. Máquina "Salão Principal" tem slug: "salao-principal"
+   ↓
+2. QR code na máquina aponta para: https://upcaraspiradores.com/salao-principal
+   ↓
+3. Usuário escaneia QR code
+   ↓
+4. Site carrega com a máquina "salao-principal" como contexto global
+   ↓
+5. Todas as operações (ativar, histórico, crédito) usam essa máquina
+```
 
-### 1️⃣ Geração Automática de Slug
+---
 
-Quando você adiciona uma máquina via `AddMachineForm`, o slug é gerado automaticamente:
+## 📁 Estrutura de Arquitetura
 
-**Exemplo:**
-- ID da máquina: `22027`
-- Localização: `Salão Principal Shopping Center`
-- Slug gerado: `salao-principal-shopping-center`
+### 1. **Rota Raiz `/` (Home)**
+- **Arquivo:** `src/app/page.tsx`
+- **Função:** Página inicial onde usuário pode:
+  - Escanear QR code (que já redireciona ao slug correto)
+  - Digitar manualmente o slug de uma máquina
+  - Ver exemplos de URLs
 
-O slug é gerado seguindo estas regras:
-- Converte para lowercase
-- Remove espaços e caracteres especiais
-- Substitui espaços por hífens
-- NÃO inclui o ID (mantém apenas a localização)
+### 2. **Rota Dinâmica `/[slug]` (Máquina Específica)**
+- **Layout:** `src/app/[slug]/layout.tsx`
+  - Captura o slug da URL
+  - Carrega a máquina do banco de dados
+  - Fornece `MachineContext` para toda a subárvore
 
-### 2️⃣ Armazenamento no Banco de Dados
+- **Página:** `src/app/[slug]/page.tsx`
+  - Exibe informações da máquina
+  - Mostra status, localização, comandos
+  - Oferece ações: Ativar, Ver Histórico, Comprar Crédito, Suporte
 
-O slug é armazenado no campo `slug_id` da tabela `machines` (apenas para referência):
+### 3. **MachineContext - Estado Global**
+- **Arquivo:** `src/contexts/MachineContext.tsx`
+- **Responsabilidade:**
+  - Armazena a máquina selecionada em contexto global
+  - Disponibiliza hook `useMachine()` para qualquer componente
+  - Carrega máquina automaticamente ao montar layout
+
+---
+
+## 🔄 Fluxo de Funcionamento
+
+### Quando usuário acessa `/salao-principal`:
+
+```
+1. URL: /salao-principal
+   ↓
+2. Next.js match rota dinâmica [slug]
+   ↓
+3. Layout [slug]/layout.tsx:
+   - Captura params.slug = "salao-principal"
+   - Chama getMachineBySlug("salao-principal")
+   - Busca máquina no banco de dados
+   - Renderiza MachineProvider com máquina
+   ↓
+4. MachineContext:
+   - Armazena máquina em estado global
+   - Hook useMachine() fica disponível
+   ↓
+5. Página [slug]/page.tsx:
+   - Acessa useMachine() para pegar máquina
+   - Exibe informações e ações
+```
+
+---
+
+## 💻 Como Usar em Componentes
+
+### Acessar dados da máquina em qualquer componente:
+
+```tsx
+'use client';
+
+import { useMachine } from '@/contexts/MachineContext';
+
+export default function MyComponent() {
+  const { machine, loading, error } = useMachine();
+
+  if (loading) return <div>Carregando...</div>;
+  if (error) return <div>Erro: {error}</div>;
+
+  return (
+    <div>
+      <h1>{machine.location}</h1>
+      <p>ID: {machine.id}</p>
+      <p>Status: {machine.status}</p>
+    </div>
+  );
+}
+```
+
+### Ativar máquina de um botão:
+
+```tsx
+'use client';
+
+import { useMachine } from '@/contexts/MachineContext';
+
+export default function ActivateButton() {
+  const { machine } = useMachine();
+
+  const handleActivate = async () => {
+    // Enviar comando para máquina
+    const response = await fetch('/api/machine/command', {
+      method: 'POST',
+      body: JSON.stringify({
+        machineId: machine.id,
+        command: 'on'
+      })
+    });
+  };
+
+  return (
+    <button onClick={handleActivate}>
+      Ativar {machine.location}
+    </button>
+  );
+}
+```
+
+---
+
+## 📱 URLs Geradas por QR Codes
+
+### Formato:
+```
+https://upcaraspiradores.com/{slug}
+```
+
+### Exemplos:
+- `/salao-principal` → Máquina ID 1
+- `/entrada-shopping` → Máquina ID 5
+- `/lavagem-completa` → Máquina ID 22027
+
+### Como gerar:
+
+1. **No banco de dados**, cada máquina tem campo `slug_id`:
+```sql
+SELECT id, location, slug_id FROM machines;
+-- Retorna:
+-- 1, Salão Principal, salao-principal
+-- 5, Entrada Shopping, entrada-shopping
+-- 22027, Lavagem Completa, lavagem-completa
+```
+
+2. **QR code aponta para:**
+```
+https://upcaraspiradores.com/salao-principal
+```
+
+3. **Usuário escaneia** → Entra automaticamente no contexto daquela máquina
+
+---
+
+## 🛣️ Rotas Disponíveis
+
+| URL | Descrição | Contexto |
+|-----|-----------|----------|
+| `/` | Home (entrada manual ou QR) | Sem máquina |
+| `/salao-principal` | Página da máquina | Máquina: salao-principal |
+| `/entrada-shopping` | Página da máquina | Máquina: entrada-shopping |
+| `/lavagem-completa` | Página da máquina | Máquina: lavagem-completa |
+
+---
+
+## 📊 Banco de Dados
+
+### Tabela `machines`:
 
 ```sql
-ALTER TABLE public.machines
-ADD COLUMN slug_id VARCHAR(255);
+CREATE TABLE public.machines (
+  id BIGINT PRIMARY KEY,
+  location VARCHAR(255) NOT NULL,
+  slug_id VARCHAR(255) UNIQUE,
+  status VARCHAR(50),
+  command VARCHAR(50),
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+
+CREATE INDEX idx_machines_slug_id ON public.machines(slug_id);
 ```
 
-**Características:**
-- ✅ Campo optional (pode ser nulo)
-- ✅ Apenas para legibilidade/SEO
-- ✅ IDs numéricos são o identificador principal
+### Exemplo de dados:
+```json
+{
+  "id": 1,
+  "location": "Salão Principal",
+  "slug_id": "salao-principal",
+  "status": "online",
+  "command": "off",
+  "created_at": "2025-11-16T10:00:00Z"
+}
+```
 
 ---
 
-## Estrutura de URLs
+## 🔌 API Endpoints
 
-### Acessar máquina por ID:
-```
-/maquina/22027
+### GET `/api/machine/by-slug`
+
+**Busca uma máquina pelo slug_id:**
+
+```bash
+GET /api/machine/by-slug?slug=salao-principal
 ```
 
-### Listar todas as máquinas:
+**Resposta (Sucesso):**
+```json
+{
+  "success": true,
+  "machine": {
+    "id": 1,
+    "location": "Salão Principal",
+    "slug_id": "salao-principal",
+    "status": "online",
+    "command": "off"
+  }
+}
 ```
-/maquinas
+
+**Resposta (Erro):**
+```json
+{
+  "error": "Máquina não encontrada",
+  "slug": "inexistente"
+}
 ```
 
 ---
 
-## Funções Disponíveis
+## 📋 Funções Database
 
-### `generateSlug(location: string, machineId?: number): string`
-Gera um slug a partir da localização (sem incluir o ID).
+### `getMachineBySlug(slugId: string)`
+Busca máquina pelo slug_id.
 
 ```typescript
-import { generateSlug } from '@/lib/database';
+const { data, error } = await getMachineBySlug('salao-principal');
+```
 
+### `generateSlug(location: string, machineId?: number)`
+Gera slug a partir da localização.
+
+```typescript
 const slug = generateSlug('Salão Principal');
 // Retorna: "salao-principal"
 ```
 
-### `getMachineById(machineId: number)`
-Busca uma máquina pelo ID no banco de dados.
-
-```typescript
-import { getMachineById } from '@/lib/database';
-
-const { data: machine, error } = await getMachineById(22027);
-if (machine) {
-  console.log(`Máquina encontrada: ${machine.location}`);
-}
-```
-
 ### `updateMachineSlug(machineId: number, slugId: string)`
-Atualiza o slug_id de uma máquina existente.
+Atualiza slug de uma máquina.
 
 ```typescript
-import { updateMachineSlug } from '@/lib/database';
-
-const { data, error } = await updateMachineSlug(22027, 'nova-localizacao');
+await updateMachineSlug(1, 'novo-slug');
 ```
 
 ---
 
-## Páginas Criadas
+## 🎯 Fluxo de QR Code Completo
 
-### 1. `/maquinas` - Lista de Máquinas
-Exibe todas as máquinas disponíveis com:
-- ID da máquina
-- Slug (para referência)
-- Localização
-- Status (Online/Offline)
-- Comando (Ligada/Desligada)
-- Link para acessar a máquina via ID
-
-### 2. `/maquina/[id]` - Detalhes da Máquina
-Mostra os detalhes completos de uma máquina específica:
-- ID (identificador na URL)
-- Slug (para referência)
-- Localização
-- Status
-- Comando
-- Data de criação/atualização
-
----
-
-## Exemplos de Uso
-
-### Adicionar Nova Máquina
-```typescript
-// No componente AddMachineForm
-const slug = generateSlug('Shopping Center Zona Norte');
-// Retorna: "shopping-center-zona-norte"
-
-// Criar máquina
-await supabase.from('machines').insert({
-  id: 22027,
-  location: 'Shopping Center Zona Norte',
-  slug_id: slug,
-  status: 'offline',
-  command: 'off'
-});
 ```
-
-### Buscar Máquina por ID
-```typescript
-// Em uma página ou componente
-const { data: machine } = await getMachineById(22027);
-
-if (machine) {
-  console.log(`Máquina ${machine.id}: ${machine.location}`);
-  console.log(`Slug: ${machine.slug_id}`);
-}
-```
-
-### Navegar para Máquina
-```typescript
-// Link direto usando ID
-<Link href={`/maquina/${machine.id}`}>
-  Ver Máquina
-</Link>
-
-// Redirect programático
-router.push(`/maquina/22027`);
+QR Code na Máquina
+  ↓
+URL: upcaraspiradores.com/salao-principal
+  ↓
+Usuário escaneia
+  ↓
+Browser abre URL
+  ↓
+Next.js match [slug]/layout.tsx
+  ↓
+getMachineBySlug('salao-principal')
+  ↓
+Busca no Supabase
+  ↓
+MachineProvider wraps página
+  ↓
+[slug]/page.tsx renderiza
+  ↓
+useMachine() hook disponível
+  ↓
+Interface carregada com máquina
+  ↓
+Usuário interage: Ativa/Histórico/Compra
 ```
 
 ---
 
-## Estrutura de URLs Finais
+## ✨ Benefícios
 
-| Ação | URL | Parâmetro |
-|------|-----|-----------|
-| Listar máquinas | `/maquinas` | Nenhum |
-| Ver máquina | `/maquina/22027` | ID numérico |
-| Ver máquina | `/maquina/1` | ID numérico |
-
----
-
-## Benefícios do Sistema
-
-✅ **URLs simples**: IDs numéricos são diretos e fáceis de usar  
-✅ **Slug para referência**: Legibilidade no banco de dados  
-✅ **Identificador único**: Cada máquina tem um ID único  
-✅ **Performance**: Índice SQL em ID para buscas rápidas  
-✅ **Escalabilidade**: Suporta múltiplas máquinas sem conflitos  
+✅ **Experiência Fluida**: QR code → Site já carregado com máquina  
+✅ **Contexto Global**: Qualquer componente sabe qual é a máquina  
+✅ **URLs Amigáveis**: `/salao-principal` ao invés de IDs numéricos  
+✅ **Escalável**: Suporta ilimitadas máquinas com slugs únicos  
+✅ **Seguro**: Slug é validado no backend contra banco de dados  
+✅ **Rápido**: Context carrega máquina só uma vez, reutiliza em toda subtree
 
 ---
 
-## Como o Slug é Usado
+## 🧪 Como Testar
 
-O `slug_id` é armazenado apenas para **referência e legibilidade** no banco de dados. Nas URLs e rotas, o sistema continua usando **IDs numéricos simples**.
-
-**Exemplo no banco de dados:**
-```json
-{
-  "id": 22027,
-  "location": "Shopping Center Zona Norte",
-  "slug_id": "shopping-center-zona-norte",
-  "status": "offline",
-  "command": "off"
-}
+### 1. Criar uma máquina no Supabase:
+```sql
+INSERT INTO public.machines (id, location, slug_id, status, command)
+VALUES (1, 'Salão Principal', 'salao-principal', 'online', 'off');
 ```
 
-**URL para acessar:**
+### 2. Acessar URL:
 ```
-/maquina/22027
+http://localhost:3000/salao-principal
+```
+
+### 3. Verificar:
+- Página carrega com a máquina
+- Mostra "Salão Principal" como título
+- Contexto global tem a máquina disponível
+
+### 4. Testar hook em componente:
+```tsx
+const { machine } = useMachine();
+console.log(machine.location); // "Salão Principal"
 ```
 
 ---
 
-## Fluxo Completo
+## 📝 Próximos Passos
 
-```
-1. Usuário abre /maquinas
-   ↓
-2. Página carrega lista de máquinas via getAllMachines()
-   ↓
-3. Usuário clica em uma máquina
-   ↓
-4. Navega para /maquina/[ID_NUMÉRICO]
-   ↓
-5. Página busca máquina via getMachineById(ID)
-   ↓
-6. API retorna dados da máquina
-   ↓
-7. Página exibe detalhes da máquina + slug (para referência)
-   ↓
-8. Usuário pode ativar, ver histórico, etc.
-```
+- [ ] Criar sub-rotas: `/[slug]/historico`, `/[slug]/credito`
+- [ ] Implementar botão "Ativar Máquina" com API
+- [ ] Filtrar histórico por máquina
+- [ ] Compra de crédito atrelada à máquina
+- [ ] Gerar QR codes dinâmicos no dashboard admin
+- [ ] Validar slugs no admin ao criar máquinas
 
----
-
-## Próximas Melhorias (Opcional)
-
-- [ ] Implementar busca de máquinas por slug_id em dashboard
-- [ ] Adicionar filtros por slug na listagem
-- [ ] Criar relatórios com slugs
-- [ ] Exportar máquinas com slugs
-
----
-
-## Suporte
-
-Caso tenha dúvidas sobre o sistema:
-1. Verifique se a migration 006 foi executada no Supabase
-2. Certifique-se que o campo `slug_id` existe na tabela `machines`
-3. Teste a rota em `/maquina/1` ou `/maquina/22027`
-
-✅ **Sistema de IDs + Slugs Implementado e Funcional!** 🚀
+✅ **Sistema de Slugs como Rota Raiz Implementado!** 🚀
