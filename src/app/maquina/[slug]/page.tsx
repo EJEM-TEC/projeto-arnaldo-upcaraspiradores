@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Machine, getMachineById } from '@/lib/database';
@@ -53,12 +54,12 @@ export default function MaquinaPage() {
                     <h1 className="text-white text-3xl font-bold mb-4">❌ Máquina não encontrada</h1>
                     <p className="text-gray-400 mb-4">ID: <code className="bg-gray-800 px-3 py-1 rounded">{machineId}</code></p>
                     <p className="text-gray-400 mb-8">{error}</p>
-                    <a
+                    <Link
                         href="/"
                         className="inline-block bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition"
                     >
                         Voltar à Home
-                    </a>
+                    </Link>
                 </div>
             </div>
         );
@@ -66,14 +67,12 @@ export default function MaquinaPage() {
 
     return (
         <div className="min-h-screen bg-black text-white py-8 px-4">
-            <div className="max-w-2xl mx-auto">
-                <div className="mb-8">
-                    <a href="/" className="text-orange-500 hover:text-orange-400 mb-4 inline-block">
-                        ← Voltar
-                    </a>
-                </div>
-
-                <div className="bg-gray-900 rounded-lg border border-gray-800 p-8">
+        <div className="max-w-2xl mx-auto">
+            <div className="mb-8">
+                <Link href="/" className="text-orange-500 hover:text-orange-400 mb-4 inline-block">
+                    ← Voltar
+                </Link>
+            </div>                <div className="bg-gray-900 rounded-lg border border-gray-800 p-8">
                     <div className="mb-8">
                         <h1 className="text-4xl font-bold mb-2">Máquina #{machine.id}</h1>
                         <p className="text-orange-500 text-lg">

@@ -1,11 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useMachine } from '@/contexts/MachineContext';
-import { useAuth } from '@/contexts/AuthContext';
 
 export default function SlugPage() {
   const { machine, loading, error } = useMachine();
-  const { user } = useAuth();
 
   if (loading) {
     return (
@@ -24,12 +23,12 @@ export default function SlugPage() {
         <div className="text-center">
           <h1 className="text-white text-3xl font-bold mb-4">❌ Máquina não encontrada</h1>
           <p className="text-gray-400 mb-8">{error || 'A máquina especificada não existe'}</p>
-          <a
+          <Link
             href="/"
             className="inline-block bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition"
           >
             Voltar
-          </a>
+          </Link>
         </div>
       </div>
     );
