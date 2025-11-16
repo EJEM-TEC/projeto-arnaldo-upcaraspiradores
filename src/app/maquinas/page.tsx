@@ -70,7 +70,7 @@ export default function ListaMaquinasPage() {
                         {machines.map((machine) => (
                             <Link
                                 key={machine.id}
-                                href={`/maquina/${machine.slug_id}`}
+                                href={`/maquina/${machine.id}`}
                                 className="group"
                             >
                                 <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 hover:border-orange-500 transition group-hover:bg-gray-800/50">

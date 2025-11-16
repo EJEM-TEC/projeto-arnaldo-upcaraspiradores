@@ -2,29 +2,28 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Machine } from '@/lib/database';
+import { Machine, getMachineById } from '@/lib/database';
 
-export default function MaquinaSlugPage() {
+export default function MaquinaPage() {
     const params = useParams();
-    const slug = params.slug as string;
+    const machineId = parseInt(params.id as string, 10);
     const [machine, setMachine] = useState<Machine | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchMachine = async () => {
-            if (!slug) return;
+            if (!machineId || isNaN(machineId)) return;
 
             try {
                 setLoading(true);
-                const response = await fetch(`/api/machine/by-slug?slug=${encodeURIComponent(slug)}`);
+                const { data, error: dbError } = await getMachineById(machineId);
 
-                if (!response.ok) {
+                if (dbError || !data) {
                     throw new Error('Máquina não encontrada');
                 }
 
-                const data = await response.json();
-                setMachine(data.machine);
+                setMachine(data);
             } catch (err) {
                 console.error('Error fetching machine:', err);
                 setError(err instanceof Error ? err.message : 'Erro ao carregar máquina');
@@ -34,7 +33,7 @@ export default function MaquinaSlugPage() {
         };
 
         fetchMachine();
-    }, [slug]);
+    }, [machineId]);
 
     if (loading) {
         return (
@@ -52,7 +51,7 @@ export default function MaquinaSlugPage() {
             <div className="min-h-screen flex items-center justify-center bg-black px-4">
                 <div className="text-center">
                     <h1 className="text-white text-3xl font-bold mb-4">❌ Máquina não encontrada</h1>
-                    <p className="text-gray-400 mb-4">Slug: <code className="bg-gray-800 px-3 py-1 rounded">{slug}</code></p>
+                    <p className="text-gray-400 mb-4">ID: <code className="bg-gray-800 px-3 py-1 rounded">{machineId}</code></p>
                     <p className="text-gray-400 mb-8">{error}</p>
                     <a
                         href="/"
