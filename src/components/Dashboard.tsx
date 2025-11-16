@@ -380,6 +380,7 @@ export default function Dashboard() {
       
       type JsPDFInstance = {
         setFontSize: (size: number) => void;
+        setTextColor: (r: number, g?: number, b?: number) => void;
         text: (text: string, x: number, y: number, opts?: Record<string, unknown>) => void;
         setLineWidth: (width: number) => void;
         line: (x1: number, y1: number, x2: number, y2: number) => void;
@@ -387,7 +388,8 @@ export default function Dashboard() {
         save: (filename: string) => void;
         setDrawColor: (r: number, g?: number, b?: number) => void;
         setFillColor: (r: number, g?: number, b?: number) => void;
-        rect: (x: number, y: number, w: number, h: number, style: string) => void;
+        rect: (x: number, y: number, w: number, h: number, style?: string) => void;
+        getTextWidth: (text: string) => number;
       };
 
       let jsPdfMod: JsPDFModule;
@@ -399,134 +401,206 @@ export default function Dashboard() {
       }
 
       const JsPDFClass = (jsPdfMod.default || jsPdfMod) as new () => JsPDFInstance;
-      const jsPDF = JsPDFClass;
-      const doc = new jsPDF();
+      const doc = new JsPDFClass();
 
       const machine = machines.find(m => m.id === machineId);
       const stats = machineStats[machineId];
 
-      // --- CABEÇALHO ---
+      // ========== PÁGINA 1: SUMÁRIO ==========
       let y = 15;
+      
+      // Cabeçalho com marca
+      doc.setFontSize(16);
+      doc.setTextColor(220, 100, 0);
+      doc.text('AspiraCar connect', 14, y);
+      doc.setTextColor(0, 0, 0);
+      y += 12;
+
+      // Título
       doc.setFontSize(18);
       doc.setDrawColor(220, 100, 0);
       doc.setFillColor(255, 240, 220);
-      doc.rect(14, y - 5, 182, 12, 'F');
-      doc.text('REPASSE DE SERVIÇOS - UpCar Aspiradores', 14, y + 2);
-      y += 20;
+      doc.rect(14, y - 8, 182, 10, 'F');
+      doc.text('RELATÓRIO - FATURAMENTO', 14, y);
+      y += 18;
 
-      // --- PERÍODO ---
-      doc.setFontSize(11);
+      // Período
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      doc.setFontSize(11);
       doc.text(`Período: ${monthStart.toLocaleDateString('pt-BR')} a ${monthEnd.toLocaleDateString('pt-BR')}`, 14, y);
-      y += 8;
+      y += 12;
 
-      // --- INFORMAÇÕES DO EQUIPAMENTO ---
-      doc.setFontSize(13);
-      doc.setDrawColor(100, 100, 100);
-      doc.text('INFORMAÇÕES DO EQUIPAMENTO', 14, y);
-      y += 8;
+      // Função auxiliar para criar tabelas simples
+      const createTable = (title: string, rows: Array<[string, string]>, startY: number) => {
+        doc.setFontSize(12);
+        doc.setTextColor(100, 100, 100);
+        doc.text(title, 14, startY);
+        
+        let tableY = startY + 7;
+        const colWidth = 85;
+        
+        // Cabeçalho
+        doc.setFillColor(220, 220, 220);
+        doc.setDrawColor(100, 100, 100);
+        doc.setLineWidth(0.5);
+        doc.rect(14, tableY - 5, colWidth, 6, 'F');
+        doc.rect(14 + colWidth, tableY - 5, colWidth, 6, 'F');
+        
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text('Descrição', 16, tableY);
+        doc.text('Valor', 14 + colWidth + 5, tableY);
+        
+        tableY += 8;
+        
+        // Linhas
+        doc.setDrawColor(150, 150, 150);
+        doc.setLineWidth(0.3);
+        doc.setFillColor(255, 255, 255);
+        doc.setFontSize(9);
+        
+        rows.forEach((row) => {
+          doc.rect(14, tableY - 5, colWidth, 6);
+          doc.rect(14 + colWidth, tableY - 5, colWidth, 6);
+          
+          doc.text(row[0], 16, tableY, { maxWidth: colWidth - 4 });
+          doc.text(row[1], 14 + colWidth + 5, tableY, { maxWidth: colWidth - 4, align: 'right' });
+          tableY += 6;
+        });
+        
+        return tableY + 4;
+      };
 
-      doc.setFontSize(11);
-      doc.text(`ID da Máquina: ${machineId}`, 14, y); y += 6;
-      doc.text(`Cidade: ${machine?.location || '-'}`, 14, y); y += 6;
-      doc.text(`Endereço: ${machine?.address || '-'}`, 14, y); y += 8;
+      // Tabela 1: Identificação
+      y = createTable('IDENTIFICAÇÃO', [
+        ['ID da Máquina', `#${machineId}`],
+        ['Localização', machine?.location || '-'],
+        ['Endereço', machine?.address || '-'],
+      ], y);
 
-      // --- RESUMO DE USO ---
-      doc.setFontSize(13);
-      doc.setDrawColor(100, 100, 100);
-      doc.text('RESUMO DE USO', 14, y);
-      y += 8;
+      y += 4;
 
-      doc.setFontSize(11);
+      // Tabela 2: Resumo de Faturamento
       const totalMinutes = stats?.totalUsageMinutes ?? 0;
       const totalHours = Math.floor(totalMinutes / 60);
       const remainingMinutes = totalMinutes % 60;
       
-      doc.text(`Total de Acionamentos: ${stats?.totalActivations ?? 0}`, 14, y); y += 6;
-      doc.text(`Tempo Total de Uso: ${totalHours}h ${remainingMinutes}m (${totalMinutes} minutos)`, 14, y); y += 8;
+      y = createTable('RESUMO DE FATURAMENTO', [
+        ['Total de Acionamentos', `${stats?.totalActivations ?? 0}`],
+        ['Tempo Total de Uso', `${totalHours}h ${remainingMinutes}m`],
+        ['Total de Minutos', `${totalMinutes}`],
+      ], y);
 
-      // --- INFORMAÇÕES FINANCEIRAS ---
-      doc.setFontSize(13);
-      doc.setDrawColor(100, 100, 100);
-      doc.text('INFORMAÇÕES FINANCEIRAS', 14, y);
-      y += 8;
+      y += 4;
 
-      doc.setFontSize(11);
-      const minuteRate = 0.50; // R$ 0.50 por minuto (ajuste conforme necessário)
+      // Tabela 3: Cálculo de Repasse
+      const minuteRate = 0.50;
       const totalAmount = totalMinutes * minuteRate;
-      const apiracarPercentage = 0.30; // 30% para APIRACAR
+      const apiracarPercentage = 0.30;
       const apiracarValue = totalAmount * apiracarPercentage;
       const yourValue = totalAmount * (1 - apiracarPercentage);
       
-      doc.text(`Tarifa por Minuto: R$ ${minuteRate.toFixed(2)}`, 14, y); y += 6;
-      doc.text(`Total de Minutos: ${totalMinutes}`, 14, y); y += 6;
-      doc.text(`Valor Total: R$ ${totalAmount.toFixed(2)}`, 14, y); y += 6;
-      doc.text(`Valor APIRACAR (30%): R$ ${apiracarValue.toFixed(2)}`, 14, y); y += 6;
-      doc.text(`Seu Repasse (70%): R$ ${yourValue.toFixed(2)}`, 14, y); y += 8;
+      y = createTable('CÁLCULO DE REPASSE FINANCEIRO', [
+        ['Tarifa por Minuto', `R$ ${minuteRate.toFixed(2)}`],
+        ['Valor Total', `R$ ${totalAmount.toFixed(2)}`],
+        ['Valor APIRACAR (30%)', `R$ ${apiracarValue.toFixed(2)}`],
+        ['Seu Repasse (70%)', `R$ ${yourValue.toFixed(2)}`],
+      ], y);
 
-      // --- HISTÓRICO DETALHADO ---
-      doc.setFontSize(13);
-      doc.setDrawColor(100, 100, 100);
-      doc.text('HISTÓRICO DETALHADO DE ACIONAMENTOS', 14, y);
-      y += 8;
+      // ========== PÁGINAS 2+: HISTÓRICO DE ACIONAMENTOS ==========
+      doc.addPage();
+      y = 15;
 
-      // Cabeçalho da tabela
-      doc.setFontSize(9);
-      doc.setFillColor(200, 150, 100);
-      doc.setDrawColor(100, 100, 100);
-      
-      const colWidths = [45, 20, 20, 25, 30];
-      const cols = ['Data/Hora', 'Comando', 'Duração', 'Temp.', 'Status'];
-      let xPos = 14;
-      
-      doc.setLineWidth(0.1);
-      for (let i = 0; i < cols.length; i++) {
-        doc.rect(xPos, y - 5, colWidths[i], 6, 'F');
-        doc.text(cols[i], xPos + 2, y, { maxWidth: colWidths[i] - 4 });
-        xPos += colWidths[i];
-      }
-      
-      y += 8;
-      doc.setFillColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setTextColor(0, 0, 0);
+      doc.text('HISTÓRICO DE RECEBIMENTOS', 14, y);
+      y += 12;
 
-      const rows = (history || []).slice(0, 150);
-      for (const item of rows) {
-        if (y > 270) {
+      // Configuração da tabela de histórico
+      const rowHeight = 7;
+      const pageHeight = 280;
+      const headerHeight = 8;
+      const margin = 10;
+      const contentWidth = 210 - 2 * margin;
+
+      // Colunas: [label, width]
+      const columns = [
+        { label: 'Data/Hora', width: 35 },
+        { label: 'Comando', width: 20 },
+        { label: 'Duração', width: 20 },
+        { label: 'Temperatura', width: 30 },
+        { label: 'Status', width: 25 },
+      ];
+
+      const renderTableHeader = (startY: number) => {
+        doc.setFillColor(220, 100, 0);
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.setLineWidth(0.5);
+        doc.setDrawColor(220, 100, 0);
+
+        let xPos = margin;
+        columns.forEach((col) => {
+          doc.rect(xPos, startY - 4, col.width, headerHeight, 'FD');
+          doc.text(col.label, xPos + 2, startY + 1, { maxWidth: col.width - 4 });
+          xPos += col.width;
+        });
+      };
+
+      const renderTableRow = (rowData: string[], startY: number) => {
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(8);
+        doc.setLineWidth(0.3);
+        doc.setDrawColor(150, 150, 150);
+
+        let xPos = margin;
+        columns.forEach((col, index) => {
+          doc.rect(xPos, startY - 4, col.width, rowHeight);
+          doc.text(rowData[index] || '-', xPos + 2, startY + 1, { maxWidth: col.width - 4 });
+          xPos += col.width;
+        });
+      };
+
+      // Render first header
+      renderTableHeader(y);
+      y += headerHeight + 2;
+
+      // Render rows
+      const rows = (history || []).slice(0, 500);
+      rows.forEach((item, index) => {
+        // Verifica se precisa de nova página
+        if (y + rowHeight > pageHeight) {
           doc.addPage();
           y = 15;
+          renderTableHeader(y);
+          y += headerHeight + 2;
         }
 
-        const start = item.started_at ? new Date(item.started_at).toLocaleString('pt-BR', { 
-          month: '2-digit', 
-          day: '2-digit', 
-          year: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
-        }) : '-';
+        const start = item.started_at
+          ? new Date(item.started_at).toLocaleString('pt-BR', {
+              month: '2-digit',
+              day: '2-digit',
+              year: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-';
         const cmd = item.command === 'on' ? 'Ligado' : item.command === 'off' ? 'Desligado' : item.command || '-';
         const dur = item.duration_minutes != null ? `${item.duration_minutes}m` : '-';
         const temp = item.average_temperature != null ? `${Number(item.average_temperature).toFixed(1)}°C` : '-';
         const st = item.status || '-';
 
-        xPos = 14;
-        const rowData = [start, cmd, dur, temp, st];
-        for (let i = 0; i < rowData.length; i++) {
-          doc.text(rowData[i], xPos + 2, y, { maxWidth: colWidths[i] - 4 });
-          xPos += colWidths[i];
-        }
-        y += 6;
-      }
+        renderTableRow([start, cmd, dur, temp, st], y);
+        y += rowHeight;
+      });
 
-      // Rodapé
-      y += 10;
-      doc.setFontSize(9);
-      doc.setDrawColor(150, 150, 150);
-      doc.line(14, y, 196, y);
-      y += 4;
-      doc.text(`Relatório gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, y);
-      doc.text('UpCar Aspiradores - Sistema de Gestão', 155, y);
+      // Rodapé na última página
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Relatório gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 285);
+      doc.text('UpCar Aspiradores - Sistema de Gestão', 120, 285);
 
       doc.save(`repasse_maquina_${machineId}_${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, '0')}.pdf`);
     } catch (err) {
