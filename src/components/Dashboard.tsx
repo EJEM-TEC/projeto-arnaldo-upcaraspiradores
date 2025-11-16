@@ -223,13 +223,13 @@ export default function Dashboard() {
       
       type JsPDFInstance = {
         setFontSize: (size: number) => void;
-        text: (text: string, x: number, y: number) => void;
+        text: (text: string, x: number, y: number, opts?: Record<string, unknown>) => void;
         setLineWidth: (width: number) => void;
         line: (x1: number, y1: number, x2: number, y2: number) => void;
         addPage: () => void;
         save: (filename: string) => void;
-        setDrawColor: (r: number) => void;
-        setFillColor: (r: number, g: number, b: number) => void;
+        setDrawColor: (r: number, g?: number, b?: number) => void;
+        setFillColor: (r: number, g?: number, b?: number) => void;
         rect: (x: number, y: number, w: number, h: number, style: string) => void;
       };
 
