@@ -65,7 +65,7 @@ export default function LateralMenu({ isOpen, onClose, user, balance, menuItems,
             />
 
             {/* Menu */}
-            <div className="fixed left-0 top-0 h-full w-80 bg-gray-900 z-50 transform transition-transform duration-300 ease-in-out">
+            <div className="fixed left-0 top-0 h-full w-80 bg-white z-50 transform transition-transform duration-300 ease-in-out">
                 <div className="p-6 h-full flex flex-col">
                     {/* User Profile Header */}
                     <div className="mb-8">
