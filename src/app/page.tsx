@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function HomePage() {
   const [slug, setSlug] = useState('');
@@ -18,9 +19,14 @@ export default function HomePage() {
       <div className="max-w-2xl w-full">
         {/* Logo/Header */}
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold mb-2">
-            <span className="text-orange-500">UpCar</span>Aspiradores
-          </h1>
+          <Image 
+            src="/upcar_preto.png" 
+            alt="UpCarAspiradores Logo" 
+            width={280} 
+            height={120}
+            priority
+            className="mx-auto mb-4"
+          />
           <p className="text-gray-400 text-lg">Sistema Inteligente de Aspiração</p>
         </div>
 

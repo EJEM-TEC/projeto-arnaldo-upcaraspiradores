@@ -35,23 +35,29 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
   const handleCancelSubscription = async () => {
     try {
       setIsCancelling(true);
-      const response = await fetch('/api/payment/subscription-cancel', {
+      
+      // Get auth token
+      const { data: { session } } = await (await import('@/lib/supabaseClient')).supabase.auth.getSession();
+      
+      const response = await fetch('/api/payment/subscription-cancellation-request', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
         },
         body: JSON.stringify({
           subscriptionId: user?.user_metadata?.subscription_id || '',
+          reason: 'User requested cancellation',
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        alert('Assinatura cancelada com sucesso!');
+        alert('Solicitação de cancelamento enviada! O administrador revisará sua solicitação em breve.');
         setModal({ type: null, open: false });
       } else {
-        alert(`Erro ao cancelar assinatura: ${data.error}`);
+        alert(`Erro ao solicitar cancelamento: ${data.error}`);
       }
     } catch (error) {
       alert('Erro ao processar cancelamento');
@@ -220,12 +226,12 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-sm text-red-800 mb-3">
-                  <strong>Atenção!</strong> Esta ação cancelará sua assinatura mensal. Você não receberá mais créditos automáticos.
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800 mb-3">
+                  <strong>Solicitar Cancelamento</strong>
                 </p>
-                <p className="text-sm text-red-700">
-                  Tem certeza que deseja cancelar sua assinatura?
+                <p className="text-sm text-yellow-700">
+                  Uma solicitação será enviada para o administrador revisar. Você receberá uma resposta em breve.
                 </p>
               </div>
               <div className="flex gap-3">
@@ -239,9 +245,9 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
                 <button
                   onClick={handleCancelSubscription}
                   disabled={isCancelling}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50"
                 >
-                  {isCancelling ? 'Cancelando...' : 'Sim, cancelar'}
+                  {isCancelling ? 'Enviando...' : 'Sim, solicitar'}
                 </button>
               </div>
             </div>

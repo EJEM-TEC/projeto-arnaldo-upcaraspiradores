@@ -9,7 +9,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { amount, userId, payer, cardToken, description } = body;
 
+    console.log('[SUBSCRIPTION] Creating subscription with payload:', {
+      amount,
+      userId,
+      payer: payer?.email,
+      description,
+      timestamp: new Date().toISOString(),
+    });
+
     if (!amount || !cardToken || !payer) {
+      console.error('[SUBSCRIPTION] Missing required fields');
       return NextResponse.json(
         { error: 'Amount, card token and payer information are required' },
         { status: 400 }
@@ -18,6 +27,7 @@ export async function POST(request: NextRequest) {
 
     const amountValue = parseFloat(amount);
     if (isNaN(amountValue) || amountValue <= 0) {
+      console.error('[SUBSCRIPTION] Invalid amount:', amount);
       return NextResponse.json(
         { error: 'Invalid amount' },
         { status: 400 }
@@ -28,10 +38,6 @@ export async function POST(request: NextRequest) {
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
       'https://projeto-arnaldo-upcaraspiradores.vercel.app';
 
-    // Cria um Preapproval (Assinatura Recorrente) no Mercado Pago
-    // Isso permite cobranças automáticas mensais
-    // Para criar assinatura, precisamos usar a API REST diretamente
-    // pois o SDK pode não ter suporte completo
     const preapprovalData = {
       reason: description || `Assinatura mensal - R$ ${amount}`,
       auto_recurring: {
@@ -39,8 +45,8 @@ export async function POST(request: NextRequest) {
         frequency_type: 'months',
         transaction_amount: amountValue,
         currency_id: 'BRL',
-        start_date: new Date(Date.now() + 86400000 * 15).toISOString(), // Próximo dia 15
-        end_date: null, // Sem data de término
+        start_date: new Date(Date.now() + 86400000 * 15).toISOString(),
+        end_date: null,
       },
       payer_email: payer.email || 'payer@example.com',
       card_token_id: cardToken,
@@ -48,7 +54,12 @@ export async function POST(request: NextRequest) {
       notification_url: `${baseUrl}/api/payment/webhook`,
     };
 
-    // Faz requisição direta à API do Mercado Pago
+    console.log('[SUBSCRIPTION] Sending to Mercado Pago:', {
+      amount: amountValue,
+      payer_email: preapprovalData.payer_email,
+      start_date: preapprovalData.auto_recurring.start_date,
+    });
+
     const response = await fetch('https://api.mercadopago.com/preapproval', {
       method: 'POST',
       headers: {
@@ -61,14 +72,23 @@ export async function POST(request: NextRequest) {
     const result = await response.json();
 
     if (!response.ok) {
-      console.error('MercadoPago API error:', result);
+      console.error('[SUBSCRIPTION] Mercado Pago error:', {
+        status: response.status,
+        error: result.message,
+        details: result,
+      });
       return NextResponse.json(
         { error: result.message || 'Failed to create subscription' },
         { status: response.status }
       );
     }
 
-    // Se a assinatura foi criada com sucesso, cria a transação no banco
+    console.log('[SUBSCRIPTION] Successfully created:', {
+      subscriptionId: result.id,
+      status: result.status,
+      payer_email: result.payer_email,
+    });
+
     if (result.id) {
       await createTransaction({
         user_id: userId || null,
@@ -87,12 +107,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    console.error('[SUBSCRIPTION] No subscription ID returned from Mercado Pago');
     return NextResponse.json(
       { error: 'Failed to create subscription' },
       { status: 500 }
     );
   } catch (error) {
-    console.error('Error creating subscription:', error);
+    console.error('[SUBSCRIPTION] Error creating subscription:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+    });
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
       { error: errorMessage },

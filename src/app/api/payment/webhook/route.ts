@@ -5,44 +5,42 @@ import { createTransaction, incrementUserBalance } from '@/lib/database';
 
 // GET para verificação (Mercado Pago pode fazer GET para validar o endpoint)
 export async function GET(_request: NextRequest) {
-  console.log('Webhook GET request received');
+  console.log('[WEBHOOK] GET request received - endpoint is active');
   return NextResponse.json({ status: 'ok', message: 'Webhook endpoint is active' }, { status: 200 });
 }
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Webhook POST request received');
+    const timestamp = new Date().toISOString();
+    console.log(`[WEBHOOK] POST request received at ${timestamp}`);
     
     // Lê o body da requisição
     let body;
     try {
       body = await request.json();
-      console.log('Webhook body received:', JSON.stringify(body, null, 2));
+      console.log(`[WEBHOOK] Body received:`, JSON.stringify(body, null, 2));
     } catch (parseError) {
-      console.error('Error parsing webhook body:', parseError);
-      // Tenta ler como texto
+      console.error(`[WEBHOOK] Error parsing webhook body:`, parseError);
       const text = await request.text();
-      console.log('Webhook body as text:', text);
-      
-      // Sempre retorna 200 mesmo com erro de parse para não bloquear o webhook
+      console.log(`[WEBHOOK] Body as text:`, text);
       return NextResponse.json({ received: true, error: 'Failed to parse body' }, { status: 200 });
     }
     
     // Verifica se é uma notificação do Mercado Pago
     const { type, data, action } = body;
 
-    console.log(`Webhook notification - Type: ${type}, Action: ${action}, Data:`, data);
+    console.log(`[WEBHOOK] Notification - Type: ${type}, Action: ${action}`);
 
     // Trata notificações de pagamento
     if (type === 'payment' || action === 'payment.updated' || action === 'payment.created') {
       const paymentId = data?.id || body.id;
       
       if (!paymentId) {
-        console.log('No payment ID found in webhook data');
+        console.log('[WEBHOOK] No payment ID found in webhook data');
         return NextResponse.json({ received: true }, { status: 200 });
       }
 
-      console.log(`Processing payment notification: ${paymentId}`);
+      console.log(`[WEBHOOK] Processing payment notification: ${paymentId}`);
 
       // Busca os detalhes do pagamento no Mercado Pago
       try {
@@ -54,9 +52,14 @@ export async function POST(request: NextRequest) {
           const externalReference = paymentDetails.external_reference || '';
           const transactionAmount = paymentDetails.transaction_amount || 0;
           
-          console.log(`Payment ${paymentId} status: ${status}, external_reference: ${externalReference}`);
+          console.log(`[WEBHOOK] Payment ${paymentId}:`, {
+            status,
+            amount: transactionAmount,
+            external_reference: externalReference,
+            payment_method_id: paymentDetails.payment_method_id,
+          });
           
-          // Extrai userId do external_reference (formato: USER_uuid ou SUBSCRIPTION_USER_uuid)
+          // Extrai userId do external_reference
           const userMatch = externalReference.match(/USER_([^_]+)/);
           const userId = userMatch ? userMatch[1] : null;
 
@@ -64,7 +67,9 @@ export async function POST(request: NextRequest) {
           if (userId && userId !== 'guest') {
             const paymentMethodId = paymentDetails.payment_method_id || 'checkout-pro';
             
-            // Busca a transação existente por external_reference ou payment ID
+            console.log(`[WEBHOOK] Looking for transaction with user_id: ${userId}`);
+            
+            // Busca a transação existente
             const { data: existingTransaction } = await supabase
               .from('transactions')
               .select('id, amount')
@@ -75,6 +80,7 @@ export async function POST(request: NextRequest) {
               .maybeSingle();
 
             if (existingTransaction) {
+              console.log(`[WEBHOOK] Found existing transaction: ${existingTransaction.id}`);
               // Atualiza a transação existente
               const { error: updateError } = await supabase
                 .from('transactions')
