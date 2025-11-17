@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import DashboardLayout from './DashboardLayout';
 import MudarSenhaForm from './mudar-senha';
 import { AddMachineForm } from './AddMachineForm';
+import CashHistoryPage from '@/components/pages/CashHistoryPage';
+import AlertsPage from '@/components/pages/AlertsPage';
 import { getAllMachines, Machine, getAllActivationHistory, ActivationHistory, createTransaction, getBillingData, Transaction, BillingData } from '@/lib/database';
 
 interface ActivationHistoryWithMachine extends ActivationHistory {
@@ -29,7 +31,7 @@ type MachineStats = {
   created_at: string | null;
 };
 
-type DashboardView = 'adicionar_credito' | 'faturamento' | 'historico_acionamentos' | 'equipamentos' | 'alterar_senha' | 'adicionar_maquina';
+type DashboardView = 'adicionar_credito' | 'faturamento' | 'historico_acionamentos' | 'equipamentos' | 'alterar_senha' | 'adicionar_maquina' | 'historico_caixa' | 'avisos';
 
 export default function Dashboard() {
   const searchParams = useSearchParams();
@@ -50,10 +52,12 @@ export default function Dashboard() {
   const [historyEnd, setHistoryEnd] = useState<string>('');
   const [expandedMachines, setExpandedMachines] = useState<Record<number, boolean>>({});
   const [machineStats, setMachineStats] = useState<Record<number, MachineStats>>({});
+  const [cashHistoryStart, setCashHistoryStart] = useState<string>('');
+  const [cashHistoryEnd, setCashHistoryEnd] = useState<string>('');
 
   useEffect(() => {
     const view = searchParams.get('view');
-    if (view && ['faturamento', 'historico_acionamentos', 'equipamentos', 'alterar_senha', 'adicionar_maquina'].includes(view)) {
+    if (view && ['faturamento', 'historico_acionamentos', 'equipamentos', 'alterar_senha', 'adicionar_maquina', 'historico_caixa', 'avisos'].includes(view)) {
       setCurrentView(view as DashboardView);
     } else {
       setCurrentView('adicionar_credito');
@@ -1526,6 +1530,21 @@ export default function Dashboard() {
                 });
               }} />
             </div>
+          </>
+        );
+
+      case 'historico_caixa':
+        return (
+          <>
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">Histórico do Caixa</h2>
+            <CashHistoryPage startDate={cashHistoryStart} endDate={cashHistoryEnd} />
+          </>
+        );
+
+      case 'avisos':
+        return (
+          <>
+            <AlertsPage />
           </>
         );
 
