@@ -85,8 +85,8 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
               <Image 
                 src="/upcar_preto.png" 
                 alt="Logo" 
-                width={140} 
-                height={60}
+                width={200} 
+                height={90}
                 className="cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => router.push('/')}
                 priority
