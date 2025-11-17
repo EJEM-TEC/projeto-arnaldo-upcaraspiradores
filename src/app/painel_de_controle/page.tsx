@@ -23,6 +23,8 @@ export default function DashboardPage() {
 
       // Verificar role do usuário
       try {
+        console.log(`[DASHBOARD] User logged in:`, user.email);
+
         // Buscar role da tabela usuarios
         const { data: profile } = await supabase
           .from('usuarios')
@@ -30,26 +32,38 @@ export default function DashboardPage() {
           .eq('id', user.id)
           .maybeSingle();
 
+        console.log(`[DASHBOARD] Profile from DB:`, profile);
+
         // arnaldfirst@gmail.com é sempre admin (prioridade sobre role na tabela)
-        let role = user.email === 'arnaldfirst@gmail.com' ? 'admin' : profile?.role;
+        const isArnald = user.email === 'arnaldfirst@gmail.com';
+        console.log(`[DASHBOARD] Is arnaldfirst@gmail.com?:`, isArnald, `(email: ${user.email})`);
+        
+        let role = isArnald ? 'admin' : profile?.role;
         if (!role) {
           role = 'cliente';
         }
 
+        console.log(`[DASHBOARD] Final role:`, role);
         setUserRole(role);
 
         // Se o usuário não é admin, redireciona para home
         if (role !== 'admin') {
+          console.log(`[DASHBOARD] Not admin, redirecting to home`);
           router.push('/home');
           return;
         }
+        console.log(`[DASHBOARD] Is admin, showing dashboard`);
       } catch (error) {
-        console.error('Erro ao verificar role:', error);
+        console.error('[DASHBOARD ERROR] Erro ao verificar role:', error);
         // Em caso de erro, verifica pelo email como fallback
         // arnaldfirst@gmail.com é sempre admin
-        const role = user.email === 'arnaldfirst@gmail.com' ? 'admin' : 'cliente';
+        const isArnald = user.email === 'arnaldfirst@gmail.com';
+        console.log(`[DASHBOARD FALLBACK] Is arnaldfirst@gmail.com?:`, isArnald, `(email: ${user.email})`);
+        const role = isArnald ? 'admin' : 'cliente';
+        console.log(`[DASHBOARD FALLBACK] Final role:`, role);
         setUserRole(role);
         if (role !== 'admin') {
+          console.log(`[DASHBOARD FALLBACK] Not admin, redirecting to home`);
           router.push('/home');
           return;
         }
