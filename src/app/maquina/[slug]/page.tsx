@@ -13,6 +13,10 @@ export default function MaquinaPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    console.log('[MACHINE PAGE] params:', params);
+    console.log('[MACHINE PAGE] slug:', slug);
+    console.log('[MACHINE PAGE] machineId:', machineId);
+
     useEffect(() => {
         const fetchMachine = async () => {
             if (!machineId || isNaN(machineId)) return;

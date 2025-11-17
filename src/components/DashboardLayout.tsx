@@ -79,9 +79,9 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
   ];
 
   return (
-    <div className="min-h-screen flex bg-gray-200">
-      {/* Sidebar - Cinza-escuro com ícones e navegação */}
-      <div className={`bg-gray-800 text-white transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'} shadow-lg`}>
+    <div className="min-h-screen flex bg-black">
+      {/* Sidebar - Preta com ícones e navegação */}
+      <div className={`bg-black text-white transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'} shadow-lg`}>
         <div className="p-4 h-full flex flex-col">
           {/* Logo/Brand */}
           <div className="flex items-center justify-center mb-8 py-4">
@@ -201,8 +201,8 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
           </div>
         </header>
 
-        {/* Main Content Area - Fundo cinza-claro */}
-        <main className="flex-1 p-6 bg-gray-200 overflow-y-auto">
+        {/* Main Content Area - Fundo preto com conteúdo em white box */}
+        <main className="flex-1 p-6 bg-black overflow-y-auto">
           <div className="bg-white rounded-lg shadow-md p-6">
             {subtitle && (
               <p className="text-gray-700 mb-6 font-medium">{subtitle}</p>

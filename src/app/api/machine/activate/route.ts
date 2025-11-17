@@ -27,16 +27,22 @@ export async function POST(request: NextRequest) {
     const { data: balanceData, error: balanceError } = await getUserBalance(userId);
     
     if (balanceError) {
-      console.error('Error fetching balance:', balanceError);
+      console.error('[ACTIVATE] Error fetching balance:', balanceError);
       return NextResponse.json(
         { error: 'Erro ao verificar saldo' },
         { status: 500 }
       );
     }
 
+    // Log detalhado para debug
+    console.log(`[ACTIVATE DEBUG] balanceData:`, JSON.stringify(balanceData, null, 2));
+    console.log(`[ACTIVATE DEBUG] balanceData.saldo type:`, typeof balanceData?.saldo);
+    console.log(`[ACTIVATE DEBUG] balanceData.saldo value:`, balanceData?.saldo);
+
     // Garante que o saldo é um número válido
-    const currentBalance = Math.round(parseFloat(String(balanceData?.saldo || 0)));
-    console.log(`[ACTIVATE] User ${userId} balance check: ${currentBalance} vs required ${totalPrice}`);
+    const rawSaldo = balanceData?.saldo;
+    const currentBalance = Number(rawSaldo) || 0;
+    console.log(`[ACTIVATE] User ${userId} balance check: currentBalance=${currentBalance} vs required=${totalPrice}`);
 
     // Verifica se o saldo é suficiente
     if (currentBalance < totalPrice) {
