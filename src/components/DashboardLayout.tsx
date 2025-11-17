@@ -26,7 +26,6 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
   };
 
   const menuItems = [
-    { name: 'Avisos', icon: '🔔', href: '/painel_de_controle?view=avisos' },
     { name: 'Novo Crédito', icon: '💲', href: '/painel_de_controle' },
     { name: 'Faturamento', icon: '📄', href: '/painel_de_controle?view=faturamento' },
     { name: 'Histórico do Caixa', icon: '💰', href: '/painel_de_controle?view=historico_caixa' },
