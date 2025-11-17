@@ -7,7 +7,8 @@ import { Machine, getMachineById } from '@/lib/database';
 
 export default function MaquinaPage() {
     const params = useParams();
-    const machineId = parseInt(params.id as string, 10);
+    const slug = params.slug as string;
+    const machineId = parseInt(slug, 10);
     const [machine, setMachine] = useState<Machine | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);

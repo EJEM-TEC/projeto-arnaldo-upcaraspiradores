@@ -34,15 +34,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const currentBalance = balanceData?.saldo || 0;
+    // Garante que o saldo é um número válido
+    const currentBalance = Math.round(parseFloat(String(balanceData?.saldo || 0)));
+    console.log(`[ACTIVATE] User ${userId} balance check: ${currentBalance} vs required ${totalPrice}`);
 
     // Verifica se o saldo é suficiente
     if (currentBalance < totalPrice) {
+      console.error(`[ACTIVATE ERROR] Insufficient balance: ${currentBalance} < ${totalPrice}`);
       return NextResponse.json(
         { 
           error: 'Saldo insuficiente', 
           currentBalance,
-          requiredBalance: totalPrice 
+          requiredBalance: totalPrice,
+          message: `Saldo disponível: R$ ${currentBalance}, necessário: R$ ${totalPrice}`
         },
         { status: 402 }
       );

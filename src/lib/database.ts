@@ -822,16 +822,20 @@ export async function decrementUserBalance(userId: string, amount: number) {
     return { data: null, error: fetchError };
   }
 
-  const currentSaldo = Math.round(currentBalance?.saldo || 0);
-  const amountRounded = Math.round(amount);
-  const newSaldo = Math.max(0, Math.round(currentSaldo - amountRounded)); // Não permite saldo negativo
+  // Garante que temos um valor numérico válido
+  const currentSaldo = Math.round(parseFloat(String(currentBalance?.saldo || 0)));
+  const amountRounded = Math.round(parseFloat(String(amount)));
+  
+  console.log(`[BALANCE DEBUG] User: ${userId}, Current: ${currentSaldo}, Amount: ${amountRounded}`);
 
   // Se saldo é insuficiente, retorna erro
   if (currentSaldo < amountRounded) {
-    const error = new Error('Saldo insuficiente');
-    console.error(`Insufficient balance for user ${userId}: current=${currentSaldo}, required=${amountRounded}`);
+    const error = new Error(`Saldo insuficiente: disponível R$ ${currentSaldo}, necessário R$ ${amountRounded}`);
+    console.error(`[BALANCE ERROR] Insufficient balance for user ${userId}: current=${currentSaldo}, required=${amountRounded}`);
     return { data: null, error };
   }
+
+  const newSaldo = Math.max(0, Math.round(currentSaldo - amountRounded)); // Não permite saldo negativo
 
   // Atualiza o saldo na tabela profiles
   const { data, error } = await supabase
