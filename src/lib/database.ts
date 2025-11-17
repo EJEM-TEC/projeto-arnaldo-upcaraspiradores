@@ -306,6 +306,35 @@ export async function getMachineById(machineId: number) {
   return { data, error: null };
 }
 
+// Get machine by slug_id or ID
+export async function getMachineBySlugOrId(slugOrId: string) {
+  // Primeiro tenta como número (ID)
+  const numSlug = parseInt(slugOrId, 10);
+  if (!isNaN(numSlug)) {
+    const { data, error } = await supabase
+      .from('machines')
+      .select('*')
+      .eq('id', numSlug)
+      .maybeSingle();
+    
+    if (data) return { data, error: null };
+  }
+
+  // Se não encontrou por ID, tenta por slug_id
+  const { data, error } = await supabase
+    .from('machines')
+    .select('*')
+    .eq('slug_id', slugOrId.toLowerCase())
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching machine by slug:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
 // Activation History functions
 export interface ActivationHistory {
   id: number;
@@ -945,26 +974,10 @@ export function generateRandomSlug(): string {
 }
 
 /**
- * Busca uma máquina pelo slug_id (6 dígitos)
+ * Busca uma máquina pelo slug_id (6 dígitos) - função legada, use getMachineBySlugOrId
  */
 export async function getMachineBySlug(slugId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('machines')
-      .select('*')
-      .eq('slug_id', slugId)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error fetching machine by slug:', error);
-      return { data: null, error };
-    }
-
-    return { data, error: null };
-  } catch (err) {
-    console.error('Unexpected error fetching machine by slug:', err);
-    return { data: null, error: err as Error };
-  }
+  return getMachineBySlugOrId(slugId);
 }
 
 /**

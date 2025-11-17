@@ -3,35 +3,44 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Machine, getMachineById } from '@/lib/database';
+import { Machine, getMachineBySlugOrId } from '@/lib/database';
 
 export default function MaquinaPage() {
     const params = useParams();
     const slug = params.slug as string;
-    const machineId = parseInt(slug, 10);
     const [machine, setMachine] = useState<Machine | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     console.log('[MACHINE PAGE] params:', params);
     console.log('[MACHINE PAGE] slug:', slug);
-    console.log('[MACHINE PAGE] machineId:', machineId);
 
     useEffect(() => {
         const fetchMachine = async () => {
-            if (!machineId || isNaN(machineId)) return;
+            if (!slug) {
+                setError('Slug não fornecido');
+                setLoading(false);
+                return;
+            }
 
             try {
                 setLoading(true);
-                const { data, error: dbError } = await getMachineById(machineId);
+                console.log('[MACHINE PAGE] Buscando máquina com slug:', slug);
+                const { data, error: dbError } = await getMachineBySlugOrId(slug);
 
-                if (dbError || !data) {
+                if (dbError) {
+                    console.error('[MACHINE PAGE] Erro ao buscar:', dbError);
+                    throw new Error('Erro ao buscar máquina');
+                }
+
+                if (!data) {
                     throw new Error('Máquina não encontrada');
                 }
 
+                console.log('[MACHINE PAGE] Máquina encontrada:', data);
                 setMachine(data);
             } catch (err) {
-                console.error('Error fetching machine:', err);
+                console.error('[MACHINE PAGE] Error fetching machine:', err);
                 setError(err instanceof Error ? err.message : 'Erro ao carregar máquina');
             } finally {
                 setLoading(false);
@@ -39,7 +48,7 @@ export default function MaquinaPage() {
         };
 
         fetchMachine();
-    }, [machineId]);
+    }, [slug]);
 
     if (loading) {
         return (
@@ -57,7 +66,7 @@ export default function MaquinaPage() {
             <div className="min-h-screen flex items-center justify-center bg-black px-4">
                 <div className="text-center">
                     <h1 className="text-white text-3xl font-bold mb-4">❌ Máquina não encontrada</h1>
-                    <p className="text-gray-400 mb-4">ID: <code className="bg-gray-800 px-3 py-1 rounded">{machineId}</code></p>
+                    <p className="text-gray-400 mb-4">Slug: <code className="bg-gray-800 px-3 py-1 rounded">{slug}</code></p>
                     <p className="text-gray-400 mb-8">{error}</p>
                     <Link
                         href="/"

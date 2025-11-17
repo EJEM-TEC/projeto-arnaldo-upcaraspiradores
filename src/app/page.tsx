@@ -10,7 +10,8 @@ export default function HomePage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (slug.trim()) {
-      window.location.href = `/${encodeURIComponent(slug.trim())}`;
+      // Se for um número, usa como ID; caso contrário, usa como slug_id
+      window.location.href = `/maquina/${encodeURIComponent(slug.trim())}`;
     }
   };
 
