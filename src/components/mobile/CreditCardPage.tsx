@@ -216,7 +216,7 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                     Selecione abaixo o quanto gostaria de adicionar:
                 </p>
 
-                <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="flex flex-wrap justify-center gap-4 mb-4">
                     {amounts.map((amount) => (
                         <button
                             key={amount}
@@ -226,7 +226,7 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                                 setError(''); // Limpa erro ao mudar valor
                             }}
                             disabled={loading}
-                            className={`w-full h-30 rounded-full font-bold text-lg transition-colors ${selectedAmount === amount
+                            className={`w-20 h-20 rounded-full font-bold text-lg transition-colors flex items-center justify-center ${selectedAmount === amount
                                 ? 'bg-orange-500 text-white'
                                 : 'bg-white text-black hover:bg-gray-200'
                                 } disabled:opacity-50`}

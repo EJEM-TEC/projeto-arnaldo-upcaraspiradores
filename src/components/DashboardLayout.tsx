@@ -14,7 +14,7 @@ interface DashboardLayoutProps {
 }
 
 interface ModalState {
-  type: 'privacidade' | 'termos' | 'cancelar_assinatura' | null;
+  type: 'cancelar_assinatura' | null;
   open: boolean;
 }
 
@@ -69,8 +69,6 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
     { name: 'Equipamentos', icon: '🔧', href: '/painel_de_controle?view=equipamentos' },
     { name: 'Alterar Senha', icon: '🔐', href: '/painel_de_controle?view=alterar_senha' },
     { name: 'Cancelar Assinatura', icon: '❌', onClick: () => setModal({ type: 'cancelar_assinatura', open: true }) },
-    { name: 'Política de Privacidade', icon: '📋', onClick: () => setModal({ type: 'privacidade', open: true }) },
-    { name: 'Termos de Uso', icon: '⚖️', onClick: () => setModal({ type: 'termos', open: true }) },
     { name: 'Sair', icon: '🚪', href: '#', onClick: handleSignOut },
   ];
 
@@ -207,89 +205,6 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
           </div>
         </main>
       </div>
-
-      {/* Modal de Política de Privacidade */}
-      {modal.open && modal.type === 'privacidade' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-2xl font-bold text-gray-900">Política de Privacidade</h2>
-              <button
-                onClick={() => setModal({ type: null, open: false })}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            <div className="p-6 text-sm text-gray-700 space-y-4">
-              <div>
-                <h3 className="font-bold text-lg mb-2">1. Informações que Coletamos</h3>
-                <p>Coletamos diferentes tipos de informações para fornecer e melhorar nosso serviço:</p>
-                <ul className="list-disc pl-6 mt-2 space-y-1">
-                  <li><strong>Dados de Cadastro:</strong> Nome e Endereço de e-mail</li>
-                  <li><strong>Dados de Pagamento:</strong> Processados pelo Mercado Pago</li>
-                  <li><strong>Dados de Saldo:</strong> Registro de saldo, gastos e tempo de uso</li>
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-2">2. Como Usamos Suas Informações</h3>
-                <p>Fornecimento de serviços, comunicação, suporte ao cliente, melhoria de serviços e segurança.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-2">3. Compartilhamento de Informações</h3>
-                <p>Não vendemos suas informações pessoais. Compartilhamos apenas com provedores de pagamento e quando exigido por lei.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-2">4. Seus Direitos (LGPD)</h3>
-                <p>Você tem direito a acessar, corrigir, solicitar anonimização ou eliminação de seus dados. Entre em contato: <strong>arnaldfirst@gmail.com</strong></p>
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-2">5. Segurança dos Dados</h3>
-                <p>Empregamos medidas de segurança técnicas e administrativas para proteger seus dados.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Termos de Uso */}
-      {modal.open && modal.type === 'termos' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-2xl font-bold text-gray-900">Termos de Uso e Condições</h2>
-              <button
-                onClick={() => setModal({ type: null, open: false })}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            <div className="p-6 text-sm text-gray-700 space-y-4">
-              <div>
-                <h3 className="font-bold text-lg mb-2">1. Descrição do Serviço</h3>
-                <p>A UpCarAspiradores fornece acesso a equipamentos de aspiração de veículos. Os usuários devem criar uma conta e adicionar créditos (&quot;Saldo&quot;).</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-2">2. Elegibilidade e Conta de Usuário</h3>
-                <p>Você deve ter pelo menos 18 anos para criar uma conta. Você é responsável por manter a confidencialidade de sua senha.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-2">3. Pagamentos e Saldo</h3>
-                <p>Todos os pagamentos são processados pelo Mercado Pago. O Saldo não é reembolsável, exceto em caso de falha comprovada do sistema.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-2">4. Obrigações do Usuário</h3>
-                <p>Você concorda em utilizar os equipamentos de forma segura, não causar danos intencionais e não usar o serviço para fins ilegais.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-2">5. Lei Aplicável</h3>
-                <p>Estes Termos serão regidos pelas leis do Brasil. <strong>E-mail:</strong> arnaldfirst@gmail.com</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal de Cancelar Assinatura */}
       {modal.open && modal.type === 'cancelar_assinatura' && (
