@@ -14,7 +14,7 @@ interface DashboardLayoutProps {
 }
 
 interface ModalState {
-  type: 'privacidade' | 'termos' | null;
+  type: 'privacidade' | 'termos' | 'cancelar_assinatura' | null;
   open: boolean;
 }
 
@@ -24,11 +24,41 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [modal, setModal] = useState<ModalState>({ type: null, open: false });
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
     router.push('/login');
     setUserMenuOpen(false);
+  };
+
+  const handleCancelSubscription = async () => {
+    try {
+      setIsCancelling(true);
+      const response = await fetch('/api/payment/subscription-cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subscriptionId: user?.user_metadata?.subscription_id || '',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert('Assinatura cancelada com sucesso!');
+        setModal({ type: null, open: false });
+      } else {
+        alert(`Erro ao cancelar assinatura: ${data.error}`);
+      }
+    } catch (error) {
+      alert('Erro ao processar cancelamento');
+      console.error('Cancel subscription error:', error);
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   const menuItems = [
@@ -38,6 +68,7 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
     { name: 'Histórico de Acionamentos', icon: '📋', href: '/painel_de_controle?view=historico_acionamentos' },
     { name: 'Equipamentos', icon: '🔧', href: '/painel_de_controle?view=equipamentos' },
     { name: 'Alterar Senha', icon: '🔐', href: '/painel_de_controle?view=alterar_senha' },
+    { name: 'Cancelar Assinatura', icon: '❌', onClick: () => setModal({ type: 'cancelar_assinatura', open: true }) },
     { name: 'Política de Privacidade', icon: '📋', onClick: () => setModal({ type: 'privacidade', open: true }) },
     { name: 'Termos de Uso', icon: '⚖️', onClick: () => setModal({ type: 'termos', open: true }) },
     { name: 'Sair', icon: '🚪', href: '#', onClick: handleSignOut },
@@ -254,6 +285,49 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
               <div>
                 <h3 className="font-bold text-lg mb-2">5. Lei Aplicável</h3>
                 <p>Estes Termos serão regidos pelas leis do Brasil. <strong>E-mail:</strong> arnaldfirst@gmail.com</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cancelar Assinatura */}
+      {modal.open && modal.type === 'cancelar_assinatura' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-2xl font-bold text-gray-900">Cancelar Assinatura</h2>
+              <button
+                onClick={() => setModal({ type: null, open: false })}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800 mb-3">
+                  <strong>Atenção!</strong> Esta ação cancelará sua assinatura mensal. Você não receberá mais créditos automáticos.
+                </p>
+                <p className="text-sm text-red-700">
+                  Tem certeza que deseja cancelar sua assinatura?
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setModal({ type: null, open: false })}
+                  disabled={isCancelling}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-900 rounded-lg hover:bg-gray-400 transition-colors font-medium disabled:opacity-50"
+                >
+                  Não, manter assinatura
+                </button>
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={isCancelling}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
+                >
+                  {isCancelling ? 'Cancelando...' : 'Sim, cancelar'}
+                </button>
               </div>
             </div>
           </div>
