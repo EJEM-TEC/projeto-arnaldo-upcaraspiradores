@@ -106,8 +106,8 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        {/* Header - Fundo amarelo com dropdown de usuário */}
-        <header className="bg-yellow-400 shadow-md border-b border-yellow-500 p-4">
+        {/* Header - Fundo branco com dropdown de usuário */}
+        <header className="bg-white shadow-sm border-b border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <h1 className="text-xl font-bold text-gray-900">
@@ -118,9 +118,9 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
               {/* User Dropdown */}
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center space-x-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 px-4 py-2 rounded-lg transition-colors font-medium"
+                className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-900 px-4 py-2 rounded-lg transition-colors font-medium"
               >
-                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center font-bold text-gray-900">
+                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold text-gray-900">
                   {user?.email?.charAt(0).toUpperCase() || 'A'}
                 </div>
                 <span className="hidden sm:inline text-sm">{user?.email?.split('@')[0]}</span>
