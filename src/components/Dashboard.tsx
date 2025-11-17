@@ -52,8 +52,10 @@ export default function Dashboard() {
   const [historyEnd, setHistoryEnd] = useState<string>('');
   const [expandedMachines, setExpandedMachines] = useState<Record<number, boolean>>({});
   const [machineStats, setMachineStats] = useState<Record<number, MachineStats>>({});
-  const [cashHistoryStart, setCashHistoryStart] = useState<string>('');
-  const [cashHistoryEnd, setCashHistoryEnd] = useState<string>('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_cashHistoryStart, _setCashHistoryStart] = useState<string>('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_cashHistoryEnd, _setCashHistoryEnd] = useState<string>('');
 
   useEffect(() => {
     const view = searchParams.get('view');
@@ -1537,7 +1539,7 @@ export default function Dashboard() {
         return (
           <>
             <h2 className="text-3xl font-bold text-gray-900 mb-6">Histórico do Caixa</h2>
-            <CashHistoryPage startDate={cashHistoryStart} endDate={cashHistoryEnd} />
+            <CashHistoryPage />
           </>
         );
 
