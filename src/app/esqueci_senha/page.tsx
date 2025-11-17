@@ -69,7 +69,7 @@ export default function ForgotPasswordPage() {
                 ) : (
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <p className="text-gray-400 text-sm text-center mb-6 px-4">
-                            Digite seu e-mail cadastrado e enviaremos um link para redefinir sua senha.
+                            Digite seu e-mail cadastrado abaixo e enviaremos um link para redefinir sua senha.
                         </p>
 
                         <input
