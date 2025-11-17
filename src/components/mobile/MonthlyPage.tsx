@@ -1,78 +1,60 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { type CardData } from './CreditCardPage';
 
 interface MonthlyPageProps {
-    onNext: (data: { amount: string; cardData?: CardData }) => void;
+    onNext: (data: { amount: string }) => void;
 }
 
 export default function MonthlyPage({ onNext }: MonthlyPageProps) {
     const [selectedAmount, setSelectedAmount] = useState('5');
-    const [cardNumber, setCardNumber] = useState('');
-    const [cvv, setCvv] = useState('');
-    const [cardholderName, setCardholderName] = useState('');
-    const [month, setMonth] = useState('');
-    const [year, setYear] = useState('');
-    const [cpf, setCpf] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [cpf, setCpf] = useState('');
     const { user } = useAuth();
     const amounts = ['5', '10', '20', '30', '40', '50'];
+    const popupIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const popupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const popupRef = useRef<Window | null>(null);
+
+    // Função para formatar CPF
+    const formatCPF = (value: string) => {
+        const cleaned = value.replace(/\D/g, '');
+        if (cleaned.length <= 3) return cleaned;
+        if (cleaned.length <= 6) return `${cleaned.slice(0, 3)}.${cleaned.slice(3)}`;
+        if (cleaned.length <= 9) return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6)}`;
+        return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6, 9)}-${cleaned.slice(9, 11)}`;
+    };
 
     const today = new Date();
     const day = today.getDate();
 
-    const handleAdd = async () => {
-        if (!cardNumber || !cvv || !cardholderName || !month || !year || !cpf) {
-            setError('Por favor, preencha todos os campos');
+    // Função para abrir o checkout-pro em pop-up (para assinatura mensal)
+    const handleCheckoutPro = async () => {
+        setError('');
+
+        // Validações
+        if (!selectedAmount || parseFloat(selectedAmount) <= 0) {
+            setError('Por favor, selecione um valor para adicionar');
             return;
         }
 
-        // Valida e limpa o mês
-        const cleanedMonth = month.replace(/\D/g, '').trim();
-        if (!cleanedMonth || cleanedMonth === '' || parseInt(cleanedMonth, 10) < 1 || parseInt(cleanedMonth, 10) > 12) {
-            setError('Mês de expiração inválido (digite um número entre 1 e 12)');
+        if (!cpf || cpf.replace(/\D/g, '').length !== 11) {
+            setError('CPF inválido');
             return;
         }
 
-        // Valida e limpa o ano
-        const cleanedYear = year.replace(/\D/g, '').trim();
-        if (!cleanedYear || cleanedYear === '') {
-            setError('Ano de expiração inválido');
+        if (!user?.email) {
+            setError('Email do usuário não encontrado');
             return;
         }
 
         setLoading(true);
-        setError('');
 
         try {
-            // Primeiro, cria o token do cartão
-            const tokenResponse = await fetch('/api/payment/token', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    cardNumber: cardNumber.replace(/\s/g, ''),
-                    cardholderName,
-                    cardExpirationMonth: cleanedMonth,
-                    cardExpirationYear: cleanedYear,
-                    securityCode: cvv,
-                    identificationType: 'CPF',
-                    identificationNumber: cpf.replace(/\D/g, ''),
-                }),
-            });
-
-            const tokenData = await tokenResponse.json();
-
-            if (!tokenResponse.ok) {
-                throw new Error(tokenData.error || 'Erro ao criar token do cartão');
-            }
-
-            // Agora cria a assinatura recorrente
-            const subscriptionResponse = await fetch('/api/payment/subscription', {
+            // Cria a preferência de pagamento (Checkout Pro) para assinatura mensal
+            const response = await fetch('/api/payment/checkout-pro', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -80,43 +62,133 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
                 body: JSON.stringify({
                     amount: selectedAmount,
                     userId: user?.id,
-                    cardToken: tokenData.token,
-                    cardNumber: cardNumber.replace(/\s/g, ''), // Envia o número para detectar a bandeira
                     payer: {
-                        email: user?.email || '',
+                        email: user.email,
                         cpf: cpf.replace(/\D/g, ''),
                     },
-                    description: `Assinatura mensal - R$ ${selectedAmount} (Dia 15)`,
+                    description: `Assinatura mensal - R$ ${selectedAmount} (Dia ${day})`,
+                    isSubscription: true, // Flag para indicar que é assinatura
                 }),
             });
 
-            const subscriptionData = await subscriptionResponse.json();
+            const data = await response.json();
 
-            if (!subscriptionResponse.ok) {
-                throw new Error(subscriptionData.error || 'Erro ao criar assinatura');
+            if (!response.ok) {
+                throw new Error(data.error || 'Erro ao criar checkout');
             }
 
-            if (subscriptionData.success) {
-                // Assinatura criada com sucesso
-                const cardData = {
-                    cardNumber,
-                    cvv,
-                    cardholderName,
-                    month: month || undefined,
-                    year: year || undefined,
-                    cpf
-                };
-                onNext({ amount: selectedAmount, cardData });
-            } else {
-                throw new Error('Falha ao criar assinatura');
+            if (!data.initPoint && !data.sandboxInitPoint) {
+                throw new Error('URL do checkout não retornada');
             }
+
+            // Usa a URL de produção ou sandbox
+            const checkoutUrl = data.initPoint || data.sandboxInitPoint;
+
+            // Abre o checkout em um pop-up
+            const width = 800;
+            const height = 600;
+            const left = (window.screen.width - width) / 2;
+            const top = (window.screen.height - height) / 2;
+
+            const popup = window.open(
+                checkoutUrl,
+                'MercadoPagoCheckout',
+                `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+            );
+
+            if (!popup) {
+                throw new Error('Não foi possível abrir o pop-up. Verifique se os pop-ups estão bloqueados.');
+            }
+
+            popupRef.current = popup;
+
+            // Limpa intervalos anteriores se existirem
+            if (popupIntervalRef.current) {
+                clearInterval(popupIntervalRef.current);
+            }
+            if (popupTimeoutRef.current) {
+                clearTimeout(popupTimeoutRef.current);
+            }
+
+            // Monitora o fechamento do pop-up e verifica o status do pagamento
+            popupIntervalRef.current = setInterval(() => {
+                if (popup.closed) {
+                    if (popupIntervalRef.current) {
+                        clearInterval(popupIntervalRef.current);
+                        popupIntervalRef.current = null;
+                    }
+                    setLoading(false);
+
+                    // Aguarda um pouco para o webhook processar
+                    setTimeout(() => {
+                        // O webhook processará o pagamento e atualizará o banco de dados
+                        onNext({
+                            amount: selectedAmount,
+                        });
+                    }, 2000);
+                }
+            }, 500);
+
+            // Listener para quando o pop-up redireciona de volta (via back_urls)
+            const handlePopupMessage = (event: MessageEvent) => {
+                // Verifica se a mensagem é do Mercado Pago
+                if (event.origin.includes('mercadopago.com') || event.origin.includes('mercadolivre.com')) {
+                    if (event.data?.type === 'mp-checkout' || event.data?.status) {
+                        if (popupIntervalRef.current) {
+                            clearInterval(popupIntervalRef.current);
+                            popupIntervalRef.current = null;
+                        }
+                        setLoading(false);
+
+                        if (event.data.status === 'approved' || event.data.status === 'success') {
+                            onNext({
+                                amount: selectedAmount,
+                            });
+                        } else {
+                            setError('Pagamento não aprovado. Tente novamente.');
+                        }
+                        window.removeEventListener('message', handlePopupMessage);
+                    }
+                }
+            };
+
+            window.addEventListener('message', handlePopupMessage);
+
+            // Timeout de segurança (5 minutos)
+            popupTimeoutRef.current = setTimeout(() => {
+                if (popup && !popup.closed) {
+                    popup.close();
+                }
+                if (popupIntervalRef.current) {
+                    clearInterval(popupIntervalRef.current);
+                    popupIntervalRef.current = null;
+                }
+                window.removeEventListener('message', handlePopupMessage);
+                setLoading(false);
+            }, 300000);
+
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Erro ao processar assinatura';
+            const errorMessage = err instanceof Error ? err.message : 'Erro ao processar pagamento';
             setError(errorMessage);
-        } finally {
+            console.error('Erro no checkout:', err);
             setLoading(false);
         }
     };
+
+    // Limpa intervalos quando o componente desmonta
+    useEffect(() => {
+        return () => {
+            if (popupIntervalRef.current) {
+                clearInterval(popupIntervalRef.current);
+            }
+            if (popupTimeoutRef.current) {
+                clearTimeout(popupTimeoutRef.current);
+            }
+            if (popupRef.current && !popupRef.current.closed) {
+                popupRef.current.close();
+            }
+        };
+    }, []);
 
     return (
         <div className="px-4 py-6">
@@ -131,115 +203,91 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
             {/* Amount Selection */}
             <div className="mb-8">
                 <p className="text-white text-lg mb-6 text-center">
-                    Selecione abaixo quanto será adicionado ao seu crédito mensalmente (Dia: {day}):
+                    Selecione abaixo o quanto gostaria de adicionar:
                 </p>
 
-                <div className="grid grid-cols-3 gap-4 mb-8">
+                <div className="flex flex-wrap justify-center gap-4 mb-4">
                     {amounts.map((amount) => (
                         <button
                             key={amount}
-                            onClick={() => setSelectedAmount(amount)}
-                            className={`w-full h-30 rounded-full font-bold text-lg transition-colors ${selectedAmount === amount
+                            type="button"
+                            onClick={() => {
+                                setSelectedAmount(amount);
+                                setError(''); // Limpa erro ao mudar valor
+                            }}
+                            disabled={loading}
+                            className={`w-20 h-20 rounded-full font-bold text-lg transition-colors flex items-center justify-center ${selectedAmount === amount
                                 ? 'bg-orange-500 text-white'
                                 : 'bg-white text-black hover:bg-gray-200'
-                                }`}
+                                } disabled:opacity-50`}
                         >
                             R$ {amount}
                         </button>
                     ))}
                 </div>
+
+                {/* Mostra o valor selecionado */}
+                <p className="text-white text-sm text-center mt-2">
+                    Valor selecionado: <span className="font-bold text-orange-500">R$ {selectedAmount}</span>
+                </p>
             </div>
 
             {/* Separator */}
             <div className="w-full h-px bg-orange-500 mb-8"></div>
 
-            {/* Credit Card Form */}
-            <div className="space-y-4 mb-8">
-                <input
-                    type="text"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    placeholder="Número do cartão"
-                    className="w-full px-4 py-4 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg"
-                />
+            {/* Informações do Checkout Pro */}
+            <div className="mb-6">
+                <p className="text-white text-sm mb-2 text-center font-semibold">
+                    Assinatura Mensal - Dia {day}
+                </p>
+                <p className="text-white text-sm mb-4 text-center text-gray-300">
+                    Você será redirecionado para o checkout seguro do Mercado Pago para finalizar o pagamento.
+                </p>
+            </div>
 
-                <input
-                    type="text"
-                    value={cvv}
-                    onChange={(e) => setCvv(e.target.value)}
-                    placeholder="CVV"
-                    className="w-full px-4 py-4 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg"
-                />
-
-                <input
-                    type="text"
-                    value={cardholderName}
-                    onChange={(e) => setCardholderName(e.target.value)}
-                    placeholder="Titular do cartão"
-                    className="w-full px-4 py-4 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg"
-                />
-
-                <div className="grid grid-cols-2 gap-4">
-                    <input
-                        type="text"
-                        value={month}
-                        onChange={(e) => {
-                            const value = e.target.value.replace(/\D/g, '');
-                            if (value === '' || (parseInt(value, 10) >= 1 && parseInt(value, 10) <= 12)) {
-                                setMonth(value);
-                            }
-                        }}
-                        onBlur={(e) => {
-                            const value = e.target.value.replace(/\D/g, '').trim();
-                            if (value && parseInt(value, 10) >= 1 && parseInt(value, 10) <= 12) {
-                                setMonth(String(parseInt(value, 10)).padStart(2, '0'));
-                            }
-                        }}
-                        placeholder="MÊS (01-12)"
-                        maxLength={2}
-                        className="w-full px-4 py-4 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg"
-                    />
-                    <input
-                        type="text"
-                        value={year}
-                        onChange={(e) => {
-                            const value = e.target.value.replace(/\D/g, '');
-                            if (value.length <= 4) {
-                                setYear(value);
-                            }
-                        }}
-                        placeholder="ANO (AAAA)"
-                        maxLength={4}
-                        className="w-full px-4 py-4 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg"
-                    />
-                </div>
-
+            {/* CPF */}
+            <div className="mb-6">
+                <label className="block text-white text-sm font-medium mb-2">
+                    CPF
+                </label>
                 <input
                     type="text"
                     value={cpf}
-                    onChange={(e) => setCpf(e.target.value)}
-                    placeholder="CPF do portador"
-                    className="w-full px-4 py-4 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg"
+                    onChange={(e) => {
+                        const formatted = formatCPF(e.target.value);
+                        setCpf(formatted);
+                        setError('');
+                    }}
+                    placeholder="000.000.000-00"
+                    maxLength={14}
+                    disabled={loading}
+                    className="w-full h-12 px-4 rounded-lg bg-white text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+                    required
                 />
             </div>
 
+            {/* Mensagem de Erro */}
             {error && (
-                <div className="mb-4 p-4 bg-red-500 text-white rounded-lg text-sm">
+                <div className="mt-4 p-4 bg-red-500 text-white rounded-lg text-sm mb-4">
                     {error}
                 </div>
             )}
 
-            {/* Add Button */}
+            {/* Botão de Pagar */}
             <button
-                onClick={handleAdd}
+                type="button"
+                onClick={handleCheckoutPro}
                 disabled={loading}
-                className="w-full bg-orange-500 text-white py-4 rounded-lg font-bold text-lg uppercase hover:bg-orange-600 transition-colors mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`w-full h-14 rounded-full font-bold text-lg transition-colors mt-6 ${loading
+                    ? 'bg-gray-500 text-white cursor-not-allowed'
+                    : 'bg-orange-500 text-white hover:bg-orange-600'
+                    } disabled:opacity-50`}
             >
-                {loading ? 'PROCESSANDO...' : 'ADICIONAR ASSINATURA'}
+                {loading ? 'Abrindo checkout...' : `PAGAR R$ ${selectedAmount} MENSALMENTE`}
             </button>
 
             {/* Secure Purchase Badge */}
-            <div className="flex items-center justify-center space-x-2">
+            <div className="flex items-center justify-center space-x-2 mt-8">
                 <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
                 </svg>
