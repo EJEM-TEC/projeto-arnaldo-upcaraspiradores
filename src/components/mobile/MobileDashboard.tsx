@@ -24,7 +24,11 @@ import CheckoutProModal from '@/components/CheckoutProModal';
 
 type MobileView = 'home' | 'balance' | 'add-credit' | 'pix' | 'credit-card' | 'monthly' | 'pix-code' | 'timer' | 'history' | 'support' | 'terms' | 'privacy';
 
-export default function MobileDashboard() {
+interface MobileDashboardProps {
+    machineSlug?: string;
+}
+
+export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
     const [currentView, setCurrentView] = useState<MobileView>('add-credit');
     const [user, setUser] = useState<User | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
