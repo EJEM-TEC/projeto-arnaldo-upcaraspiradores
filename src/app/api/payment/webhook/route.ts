@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPaymentClient } from '@/lib/mercadopago';
 import { supabase } from '@/lib/supabaseClient';
-import { createTransaction, incrementUserBalance } from '@/lib/database';
+import { supabaseServer } from '@/lib/supabaseServer';
+import { createTransaction } from '@/lib/database';
 
 // GET para verificação (Mercado Pago pode fazer GET para validar o endpoint)
 export async function GET(_request: NextRequest) {
@@ -119,17 +120,39 @@ export async function POST(request: NextRequest) {
               // transactionAmount vem em reais (ex: 5.00), mas precisamos garantir que seja inteiro
               const amountToAdd = Math.round(transactionAmount);
               
-              // Incrementa o saldo do usuário na tabela profiles
+              // Incrementa o saldo do usuário na tabela profiles usando service_role
               try {
-                const { data: balanceData, error: balanceError } = await incrementUserBalance(
-                  userId,
-                  amountToAdd
-                );
+                // Busca o saldo atual
+                const { data: currentBalance, error: fetchError } = await supabaseServer
+                  .from('profiles')
+                  .select('saldo')
+                  .eq('id', userId)
+                  .maybeSingle();
 
-                if (balanceError) {
-                  console.error(`Error incrementing balance for user ${userId}:`, balanceError);
+                if (fetchError) {
+                  console.error(`Error fetching balance for user ${userId}:`, fetchError);
                 } else {
-                  console.log(`Balance incremented successfully for user ${userId}. New balance: ${balanceData?.saldo}`);
+                  const currentSaldo = Math.round(currentBalance?.saldo || 0);
+                  const newSaldo = Math.round(currentSaldo + amountToAdd);
+
+                  // Atualiza o saldo
+                  const { data: balanceData, error: updateError } = await supabaseServer
+                    .from('profiles')
+                    .upsert({
+                      id: userId,
+                      saldo: newSaldo,
+                      updated_at: new Date().toISOString(),
+                    }, {
+                      onConflict: 'id'
+                    })
+                    .select()
+                    .single();
+
+                  if (updateError) {
+                    console.error(`Error updating balance for user ${userId}:`, updateError);
+                  } else {
+                    console.log(`Balance incremented successfully for user ${userId}. Previous: ${currentSaldo}, Added: ${amountToAdd}, New: ${balanceData?.saldo}`);
+                  }
                 }
               } catch (balanceError) {
                 console.error(`Unexpected error incrementing balance for user ${userId}:`, balanceError);
