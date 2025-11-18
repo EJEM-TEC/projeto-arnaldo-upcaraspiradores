@@ -16,360 +16,275 @@ interface TableRow {
   tempoEmMin: number;
   valorPorAspira: number;
   quantidade: number;
-  saldoUtilizado: number;
+  valorTotal: number;
 }
 
 interface ExcelData {
   summary: SummaryData;
   tableData: TableRow[];
-  rawData: unknown[];
 }
 
 export default function ExcelUploader() {
   const [excelData, setExcelData] = useState<ExcelData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+
+  const extractCellValue = (cell: unknown): number | string => {
+    if (!cell) return '';
+    const cellObj = cell as Record<string, unknown>;
+    if (cellObj.v !== undefined && cellObj.v !== null) {
+      return cellObj.v as number | string;
+    }
+    return '';
+  };
 
   const processExcelFile = async (file: File) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Ler o arquivo
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const workbook = XLSX.read(arrayBuffer, { 
+        type: 'array',
+        cellFormula: true,
+        cellStyles: true
+      });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 
-      // Extrair dados brutos
-      const rawData = XLSX.utils.sheet_to_json(worksheet, { 
-        defval: '',
-        blankrows: false 
-      });
+      console.log('Processando planilha Excel...');
 
-      console.log('Raw data from Excel:', rawData);
-
-      // ===== EXTRAIR RESUMO (CABEÇALHO) =====
-      // Procura pelas células com 'Receita POSTO', 'Receita APP', etc
+      // EXTRAIR RESUMO (linhas 1-4, coluna B)
       const summary: SummaryData = {
-        receitaPosto: 0,
-        receitaApp: 0,
-        receitaPix: 0,
-        receitaCartao: 0,
+        receitaPosto: Number(extractCellValue(worksheet['B1'])) || 0,
+        receitaApp: Number(extractCellValue(worksheet['B2'])) || 0,
+        receitaPix: Number(extractCellValue(worksheet['B3'])) || 0,
+        receitaCartao: Number(extractCellValue(worksheet['B4'])) || 0,
         totalReceita: 0,
       };
 
-      // Método 1: Varrer as primeiras linhas procurando pelos rótulos
-      for (let i = 0; i < Math.min(10, rawData.length); i++) {
-        const row = rawData[i] as Record<string, unknown>;
-        
-        // Procura por chaves/valores que contenham os rótulos
-        Object.entries(row).forEach(([key, value]) => {
-          const cellValue = String(value).toLowerCase().trim();
-          const nextKey = Object.keys(row)[Object.keys(row).indexOf(key) + 1];
-          const nextValue = nextKey ? Number(row[nextKey]) || 0 : 0;
+      // Calcular total de receita
+      summary.totalReceita = summary.receitaPosto + summary.receitaApp + summary.receitaPix + summary.receitaCartao;
 
-          if (cellValue.includes('receita') && cellValue.includes('posto')) {
-            summary.receitaPosto = nextValue;
-          } else if (cellValue.includes('receita') && cellValue.includes('app')) {
-            summary.receitaApp = nextValue;
-          } else if (cellValue.includes('receita') && cellValue.includes('pix')) {
-            summary.receitaPix = nextValue;
-          } else if (cellValue.includes('receita') && cellValue.includes('cartão')) {
-            summary.receitaCartao = nextValue;
-          }
-        });
-      }
+      console.log('Resumo extraído:', summary);
 
-      summary.totalReceita = 
-        summary.receitaPosto + 
-        summary.receitaApp + 
-        summary.receitaPix + 
-        summary.receitaCartao;
+      // EXTRAIR TABELA (a partir da linha 7)
+      const tableData: TableRow[] = [];
+      let rowIndex = 7;
 
-      console.log('Extracted summary:', summary);
+      while (true) {
+        const equipamentoCell = XLSX.utils.encode_cell({ r: rowIndex - 1, c: 0 });
+        const tempoCell = XLSX.utils.encode_cell({ r: rowIndex - 1, c: 1 });
+        const valorCell = XLSX.utils.encode_cell({ r: rowIndex - 1, c: 2 });
+        const qtdCell = XLSX.utils.encode_cell({ r: rowIndex - 1, c: 3 });
 
-      // ===== EXTRAIR TABELA DE HISTÓRICO =====
-      // Procura pela linha que contém os cabeçalhos da tabela
-      let tableStartIndex = -1;
+        const equipamento = String(extractCellValue(worksheet[equipamentoCell])).trim();
 
-      for (let i = 0; i < rawData.length; i++) {
-        const row = rawData[i] as Record<string, unknown>;
-        const rowKeys = Object.keys(row).map(k => String(k).toLowerCase().trim());
-        const rowValues = Object.values(row).map(v => String(v).toLowerCase().trim());
-
-        // Verifica se alguma coluna contém "equipamento"
-        if (rowKeys.some(k => k.includes('equipamento')) || rowValues.some(v => v.includes('equipamento'))) {
-          tableStartIndex = i;
+        if (!equipamento || equipamento === '') {
           break;
         }
+
+        const tempoEmMin = Number(extractCellValue(worksheet[tempoCell])) || 0;
+        const valorPorAspira = Number(extractCellValue(worksheet[valorCell])) || 0;
+        const quantidade = Number(extractCellValue(worksheet[qtdCell])) || 0;
+
+        // CALCULAR valor total
+        const valorTotal = Math.round(valorPorAspira * quantidade * 100) / 100;
+
+        tableData.push({
+          equipamento,
+          tempoEmMin,
+          valorPorAspira,
+          quantidade,
+          valorTotal,
+        });
+
+        rowIndex++;
+
+        if (rowIndex > 107) break;
       }
 
-      console.log('Table start index:', tableStartIndex);
+      console.log('Tabela extraída:', tableData);
 
-      // Se encontrou a tabela, extrai os dados
-      let tableData: TableRow[] = [];
-      if (tableStartIndex >= 0) {
-        // Pega os dados a partir da linha depois do cabeçalho
-        const tableRows = rawData.slice(tableStartIndex + 1);
-
-        tableData = tableRows
-          .map((row: unknown) => {
-            const rowData = row as Record<string, unknown>;
-            
-            // Encontra as colunas relevantes (independente do nome exato)
-            const keys = Object.keys(rowData);
-            let equipamento = '';
-            let tempoEmMin = 0;
-            let valorPorAspira = 0;
-            let quantidade = 0;
-            let saldoUtilizado = 0;
-
-            // Mapeia as colunas
-            keys.forEach((key, index) => {
-              const keyLower = String(key).toLowerCase();
-              const value = rowData[key];
-
-              if (keyLower.includes('equipamento')) {
-                equipamento = String(value);
-              } else if (keyLower.includes('tempo') && keyLower.includes('min')) {
-                tempoEmMin = Number(value) || 0;
-              } else if (keyLower.includes('valor') && keyLower.includes('aspira')) {
-                valorPorAspira = Number(value) || 0;
-              } else if (keyLower.includes('quantidade')) {
-                quantidade = Number(value) || 0;
-              } else if (keyLower.includes('saldo') && keyLower.includes('utilizado')) {
-                saldoUtilizado = Number(value) || 0;
-              }
-              
-              // Fallback: se for a coluna 1, 2, 3, 4, 5
-              if (index === 0) equipamento = equipamento || String(value);
-              if (index === 1) tempoEmMin = tempoEmMin || Number(value) || 0;
-              if (index === 2) valorPorAspira = valorPorAspira || Number(value) || 0;
-              if (index === 3) quantidade = quantidade || Number(value) || 0;
-              if (index === 4) saldoUtilizado = saldoUtilizado || Number(value) || 0;
-            });
-
-            // Valida se há dados na linha
-            if (equipamento || tempoEmMin || quantidade) {
-              return {
-                equipamento,
-                tempoEmMin,
-                valorPorAspira,
-                quantidade,
-                saldoUtilizado,
-              };
-            }
-            return null;
-          })
-          .filter((row): row is TableRow => row !== null && row.equipamento.trim() !== '');
+      if (tableData.length === 0) {
+        throw new Error('Nenhuma linha de equipamento foi encontrada na planilha. Verifique o formato.');
       }
 
-      console.log('Extracted table data:', tableData);
-
-      const result: ExcelData = {
+      setExcelData({
         summary,
         tableData,
-        rawData,
-      };
-
-      setExcelData(result);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido ao processar arquivo';
-      setError(errorMsg);
-      console.error('Error processing Excel:', err);
+      });
+    } catch (error) {
+      console.error('Erro ao processar Excel:', error);
+      setError(error instanceof Error ? error.message : 'Erro ao processar arquivo');
+      setExcelData(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
-      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-        setError('Por favor, selecione um arquivo Excel (.xlsx ou .xls)');
+      if (!file.name.endsWith('.xlsx')) {
+        setError('Apenas arquivos .xlsx são suportados');
         return;
       }
       processExcelFile(file);
     }
   };
 
-  const handleSaveToDatabase = async () => {
-    if (!excelData) {
-      setError('Nenhum dado para salvar');
-      return;
-    }
+  const handleSaveToDB = async () => {
+    if (!excelData) return;
 
     try {
-      setLoading(true);
-      
+      setUploadLoading(true);
       const response = await fetch('/api/excel/import', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(excelData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao salvar dados');
+        throw new Error(result.error || 'Erro ao salvar dados');
       }
 
-      alert('Dados salvos com sucesso!');
+      alert(`✅ Dados importados com sucesso! ${result.rowsCount} linhas salvas.`);
       setExcelData(null);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Erro ao salvar dados';
-      setError(errorMsg);
+      const input = document.getElementById('excel-upload') as HTMLInputElement;
+      if (input) input.value = '';
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Erro ao salvar dados');
     } finally {
-      setLoading(false);
+      setUploadLoading(false);
     }
   };
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-lg">
-      <h2 className="text-2xl font-bold mb-6 text-gray-900">Importar Dados Excel</h2>
-
-      {/* Input file */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Selecione arquivo Excel (.xlsx)
+    <div className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg shadow-lg">
+      <h2 className="text-2xl font-bold mb-4 text-gray-900">📤 Upload Planilha Preenchida</h2>
+      
+      <div className="bg-white p-6 rounded-lg border border-gray-200 mb-6">
+        <label className="block mb-4">
+          <span className="text-lg font-semibold text-gray-800 mb-2 block">Selecione o arquivo Excel:</span>
+          <input
+            type="file"
+            id="excel-upload"
+            accept=".xlsx"
+            onChange={handleFileChange}
+            disabled={loading}
+            className="w-full px-4 py-3 border-2 border-dashed border-blue-400 rounded-lg cursor-pointer hover:border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          />
         </label>
-        <input
-          type="file"
-          accept=".xlsx,.xls"
-          onChange={handleFileChange}
-          disabled={loading}
-          className="block w-full text-sm text-gray-500
-            file:mr-4 file:py-2 file:px-4
-            file:rounded-md file:border-0
-            file:text-sm file:font-semibold
-            file:bg-blue-50 file:text-blue-700
-            hover:file:bg-blue-100
-            disabled:opacity-50 disabled:cursor-not-allowed"
-        />
+
+        {error && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-800 font-semibold">❌ Erro:</p>
+            <p className="text-red-700">{error}</p>
+          </div>
+        )}
+
+        {loading && (
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-blue-800">⏳ Processando arquivo...</p>
+          </div>
+        )}
       </div>
 
-      {/* Erro */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-700">❌ {error}</p>
-        </div>
-      )}
-
-      {/* Loading */}
-      {loading && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-sm text-blue-700">⏳ Processando arquivo...</p>
-        </div>
-      )}
-
-      {/* Dados Extraídos */}
       {excelData && (
         <div className="space-y-6">
-          {/* Resumo */}
-          <div className="bg-gradient-to-r from-green-50 to-blue-50 p-6 rounded-lg border border-green-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Resumo Financeiro</h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-white p-3 rounded border border-green-100">
-                <p className="text-xs text-gray-600">Receita POSTO</p>
-                <p className="text-lg font-bold text-green-600">
+          {/* RESUMO */}
+          <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-6 rounded-lg border border-orange-300">
+            <h3 className="text-xl font-bold text-orange-900 mb-4">📊 RESUMO FINANCEIRO</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-lg border border-orange-200">
+                <p className="text-sm text-gray-600">Receita POSTO</p>
+                <p className="text-2xl font-bold text-orange-600">
                   R$ {excelData.summary.receitaPosto.toFixed(2)}
                 </p>
               </div>
-              <div className="bg-white p-3 rounded border border-blue-100">
-                <p className="text-xs text-gray-600">Receita APP</p>
-                <p className="text-lg font-bold text-blue-600">
+              <div className="bg-white p-4 rounded-lg border border-orange-200">
+                <p className="text-sm text-gray-600">Receita APP</p>
+                <p className="text-2xl font-bold text-orange-600">
                   R$ {excelData.summary.receitaApp.toFixed(2)}
                 </p>
               </div>
-              <div className="bg-white p-3 rounded border border-purple-100">
-                <p className="text-xs text-gray-600">Receita PIX</p>
-                <p className="text-lg font-bold text-purple-600">
+              <div className="bg-white p-4 rounded-lg border border-orange-200">
+                <p className="text-sm text-gray-600">Receita PIX</p>
+                <p className="text-2xl font-bold text-orange-600">
                   R$ {excelData.summary.receitaPix.toFixed(2)}
                 </p>
               </div>
-              <div className="bg-white p-3 rounded border border-orange-100">
-                <p className="text-xs text-gray-600">Receita CARTÃO</p>
-                <p className="text-lg font-bold text-orange-600">
+              <div className="bg-white p-4 rounded-lg border border-orange-200">
+                <p className="text-sm text-gray-600">Receita CARTÃO</p>
+                <p className="text-2xl font-bold text-orange-600">
                   R$ {excelData.summary.receitaCartao.toFixed(2)}
                 </p>
               </div>
-              <div className="bg-white p-3 rounded border-2 border-green-400">
-                <p className="text-xs text-gray-600 font-semibold">Total</p>
-                <p className="text-lg font-bold text-green-700">
-                  R$ {excelData.summary.totalReceita.toFixed(2)}
-                </p>
-              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-orange-300 flex justify-between items-center">
+              <p className="text-lg font-bold text-orange-900">Total de Receita</p>
+              <p className="text-3xl font-bold text-orange-700">
+                R$ {excelData.summary.totalReceita.toFixed(2)}
+              </p>
             </div>
           </div>
 
-          {/* Tabela de Histórico */}
-          <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              📋 Dados de Equipamentos ({excelData.tableData.length} linhas)
+          {/* TABELA */}
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <h3 className="text-xl font-bold text-gray-900 p-6 pb-4 border-b border-gray-200">
+              📋 EQUIPAMENTOS ({excelData.tableData.length} linhas)
             </h3>
-            {excelData.tableData.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-200 text-gray-900">
-                      <th className="px-4 py-2 text-left">Equipamento</th>
-                      <th className="px-4 py-2 text-right">Tempo (min)</th>
-                      <th className="px-4 py-2 text-right">Valor/Aspira</th>
-                      <th className="px-4 py-2 text-right">Quantidade</th>
-                      <th className="px-4 py-2 text-right">Saldo Utilizado</th>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-blue-600 text-white">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold">Equipamento</th>
+                    <th className="px-4 py-3 text-center font-semibold">Tempo (min)</th>
+                    <th className="px-4 py-3 text-right font-semibold">Valor/Aspira</th>
+                    <th className="px-4 py-3 text-center font-semibold">Quantidade</th>
+                    <th className="px-4 py-3 text-right font-semibold">Valor Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {excelData.tableData.map((row, idx) => (
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-blue-50' : 'bg-white'}>
+                      <td className="px-4 py-3 text-gray-900 font-medium">{row.equipamento}</td>
+                      <td className="px-4 py-3 text-center text-gray-700">{row.tempoEmMin}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">
+                        R$ {row.valorPorAspira.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-700">{row.quantidade}</td>
+                      <td className="px-4 py-3 text-right font-bold text-green-600">
+                        R$ {row.valorTotal.toFixed(2)}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {excelData.tableData.map((row, idx) => (
-                      <tr key={idx} className="border-b border-gray-300 hover:bg-gray-100">
-                        <td className="px-4 py-2">{row.equipamento}</td>
-                        <td className="px-4 py-2 text-right">{row.tempoEmMin}</td>
-                        <td className="px-4 py-2 text-right">
-                          R$ {row.valorPorAspira.toFixed(2)}
-                        </td>
-                        <td className="px-4 py-2 text-right">{row.quantidade}</td>
-                        <td className="px-4 py-2 text-right font-semibold">
-                          R$ {row.saldoUtilizado.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-gray-500 text-center py-4">Nenhum dado de equipamento encontrado</p>
-            )}
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {/* Botão Salvar */}
-          <div className="flex gap-3">
-            <button
-              onClick={handleSaveToDatabase}
-              disabled={loading}
-              className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition"
-            >
-              💾 Salvar no Banco de Dados
-            </button>
-            <button
-              onClick={() => {
-                setExcelData(null);
-                setError(null);
-              }}
-              disabled={loading}
-              className="px-4 py-3 bg-gray-400 hover:bg-gray-500 disabled:bg-gray-300 text-white rounded-lg font-medium transition"
-            >
-              ❌ Limpar
-            </button>
-          </div>
+          {/* BOTÃO SALVAR */}
+          <button
+            onClick={handleSaveToDB}
+            disabled={uploadLoading}
+            className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold text-lg rounded-lg shadow-lg hover:shadow-xl transition disabled:cursor-not-allowed"
+          >
+            {uploadLoading ? '⏳ Salvando...' : '💾 Salvar no Banco de Dados'}
+          </button>
+        </div>
+      )}
 
-          {/* JSON Raw */}
-          <details className="bg-gray-50 p-4 rounded border border-gray-200">
-            <summary className="cursor-pointer font-medium text-gray-700 hover:text-gray-900">
-              📄 Ver dados brutos (JSON)
-            </summary>
-            <pre className="mt-3 p-3 bg-gray-900 text-green-400 rounded overflow-x-auto text-xs">
-              {JSON.stringify({ summary: excelData.summary, tableData: excelData.tableData }, null, 2)}
-            </pre>
-          </details>
+      {!excelData && !loading && (
+        <div className="p-6 bg-blue-50 rounded-lg border border-blue-200 text-center">
+          <p className="text-blue-900 font-semibold text-lg">
+            📁 Selecione uma planilha Excel preenchida para começar
+          </p>
         </div>
       )}
     </div>

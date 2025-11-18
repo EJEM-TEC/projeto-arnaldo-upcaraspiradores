@@ -23,10 +23,14 @@ export default function ExcelTemplateGenerator() {
         ['Receita CARTÃO', 0],
         [], // Linha em branco (linha 5)
         // Cabeçalho da tabela (linha 6)
-        ['Equipamento', 'Tempo em min', 'Valor por aspira', 'Quantidade', 'Saldo utilizado'],
-        // Dados da tabela (a partir de linha 7)
-        ['Exemplo: Aspirador 1', 120, 5.00, 10, 50.00],
-        ['Exemplo: Aspirador 2', 90, 3.00, 5, 15.00],
+        ['Equipamento', 'Tempo em min', 'Valor por aspira', 'Quantidade', 'Valor Total'],
+        // Dados da tabela (a partir de linha 7) - com fórmulas
+        ['Exemplo: Aspirador 1', 120, 5.00, 10, '=C7*D7'],
+        ['Exemplo: Aspirador 2', 90, 3.00, 5, '=C8*D8'],
+        // Linhas em branco para preenchimento
+        ['', '', '', '', ''],
+        ['', '', '', '', ''],
+        ['', '', '', '', ''],
       ];
 
       // Criar worksheet

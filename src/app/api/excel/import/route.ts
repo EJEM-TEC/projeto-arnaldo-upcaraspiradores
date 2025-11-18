@@ -14,7 +14,7 @@ interface TableRow {
   tempoEmMin: number;
   valorPorAspira: number;
   quantidade: number;
-  saldoUtilizado: number;
+  valorTotal: number;
 }
 
 interface RequestBody {
@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
       tempo_em_min: row.tempoEmMin,
       valor_por_aspira: row.valorPorAspira,
       quantidade: row.quantidade,
-      saldo_utilizado: row.saldoUtilizado,
-      valor_total: row.valorPorAspira * row.quantidade, // Cálculo: valor × quantidade
+      saldo_utilizado: row.valorTotal, // Usar valorTotal (já calculado no frontend)
+      valor_total: row.valorTotal,
       created_at: new Date().toISOString(),
     }));
 
