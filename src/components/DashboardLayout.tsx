@@ -35,10 +35,10 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
   const handleCancelSubscription = async () => {
     try {
       setIsCancelling(true);
-      
+
       // Get auth token
       const { data: { session } } = await (await import('@/lib/supabaseClient')).supabase.auth.getSession();
-      
+
       const response = await fetch('/api/payment/subscription-cancellation-request', {
         method: 'POST',
         headers: {
@@ -85,23 +85,15 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
         <div className="p-4 h-full flex flex-col">
           {/* Logo/Brand */}
           <div className="flex items-center justify-center mb-8 py-4">
-            {sidebarOpen ? (
-              <Image 
-                src="/upcar_preto.png" 
-                alt="Logo" 
-                width={200} 
-                height={90}
-                className="cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => router.push('/')}
-                priority
-              />
-            ) : (
-              <div className="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center font-bold text-lg cursor-pointer hover:bg-orange-700 transition"
-                onClick={() => router.push('/')}
-              >
-                U
-              </div>
-            )}
+            <Image
+              src="/upcar_preto.png"
+              alt="Logo"
+              width={sidebarOpen ? 200 : 48}
+              height={sidebarOpen ? 90 : 48}
+              className={`cursor-pointer hover:opacity-80 transition-all duration-300 ${sidebarOpen ? '' : 'object-contain'}`}
+              onClick={() => router.push('/')}
+              priority
+            />
           </div>
 
           {/* Toggle Button */}
@@ -113,7 +105,7 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
           </button>
 
           {/* Navigation Menu - Flex grow para ocupar espaço */}
-          <nav className="space-y-1 flex-grow">
+          <nav className="space-y-1 grow">
             {menuItems.slice(0, -2).map((item) => (
               item.href ? (
                 <Link
@@ -202,7 +194,7 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
         </header>
 
         {/* Main Content Area - Fundo preto com conteúdo em white box */}
-        <main className="flex-1 p-6 bg-black overflow-y-auto">
+        <main className="flex-1 p-6 bg-white overflow-y-auto">
           <div className="bg-white rounded-lg shadow-md p-6">
             {subtitle && (
               <p className="text-gray-700 mb-6 font-medium">{subtitle}</p>

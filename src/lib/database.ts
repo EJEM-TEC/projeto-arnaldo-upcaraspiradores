@@ -1003,3 +1003,128 @@ export async function isSlugExists(slugId: string): Promise<boolean> {
     return false;
   }
 }
+
+// ============================================
+// EXCEL IMPORTS FUNCTIONS
+// ============================================
+
+export interface ExcelImport {
+  id: number;
+  receita_posto: number;
+  receita_app: number;
+  receita_pix: number;
+  receita_cartao: number;
+  total_receita: number;
+  imported_at: string;
+  created_at: string;
+}
+
+export interface ExcelImportRow {
+  id: number;
+  import_id: number;
+  equipamento: string;
+  tempo_em_min: number;
+  valor_por_aspira: number;
+  quantidade: number;
+  saldo_utilizado: number;
+  valor_total: number;
+  created_at: string;
+}
+
+// Get all Excel imports with their rows
+export async function getExcelImports(limit: number = 50) {
+  const { data, error } = await supabase
+    .from('excel_imports')
+    .select(`
+      id,
+      receita_posto,
+      receita_app,
+      receita_pix,
+      receita_cartao,
+      total_receita,
+      imported_at,
+      created_at,
+      excel_import_rows (
+        id,
+        import_id,
+        equipamento,
+        tempo_em_min,
+        valor_por_aspira,
+        quantidade,
+        saldo_utilizado,
+        valor_total,
+        created_at
+      )
+    `)
+    .order('imported_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching Excel imports:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
+// Get a specific Excel import with its rows
+export async function getExcelImportById(importId: number) {
+  const { data, error } = await supabase
+    .from('excel_imports')
+    .select(`
+      id,
+      receita_posto,
+      receita_app,
+      receita_pix,
+      receita_cartao,
+      total_receita,
+      imported_at,
+      created_at,
+      excel_import_rows (
+        id,
+        import_id,
+        equipamento,
+        tempo_em_min,
+        valor_por_aspira,
+        quantidade,
+        saldo_utilizado,
+        valor_total,
+        created_at
+      )
+    `)
+    .eq('id', importId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching Excel import:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
+// Get summary statistics from Excel imports
+export async function getExcelImportSummary() {
+  const { data, error } = await supabase
+    .from('excel_imports')
+    .select('total_receita, imported_at, created_at');
+
+  if (error) {
+    console.error('Error fetching import summary:', error);
+    return { data: null, error };
+  }
+
+  // Calcular totais
+  const totalReceita = (data || []).reduce((sum, item) => sum + (item.total_receita || 0), 0);
+  const importCount = data?.length || 0;
+  const lastImportDate = data?.[0]?.imported_at || null;
+
+  return {
+    data: {
+      totalReceita,
+      importCount,
+      lastImportDate,
+    },
+    error: null,
+  };
+}
