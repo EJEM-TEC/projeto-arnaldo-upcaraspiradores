@@ -73,6 +73,7 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
     { name: 'Histórico do Caixa', icon: '💰', href: '/painel_de_controle?view=historico_caixa' },
     { name: 'Histórico de Acionamentos', icon: '📋', href: '/painel_de_controle?view=historico_acionamentos' },
     { name: 'Equipamentos', icon: '🔧', href: '/painel_de_controle?view=equipamentos' },
+    { name: 'Importar Excel', icon: '📊', href: '/painel_de_controle?view=importar_excel' },
     { name: 'Alterar Senha', icon: '🔐', href: '/painel_de_controle?view=alterar_senha' },
     { name: 'Cancelar Assinatura', icon: '❌', onClick: () => setModal({ type: 'cancelar_assinatura', open: true }) },
     { name: 'Sair', icon: '🚪', href: '#', onClick: handleSignOut },

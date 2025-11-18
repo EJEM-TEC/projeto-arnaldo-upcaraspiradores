@@ -6,6 +6,8 @@ import DashboardLayout from './DashboardLayout';
 import MudarSenhaForm from './mudar-senha';
 import { AddMachineForm } from './AddMachineForm';
 import CashHistoryPage from '@/components/pages/CashHistoryPage';
+import ExcelTemplateGenerator from './ExcelTemplateGenerator';
+import ExcelUploader from './ExcelUploader';
 import { getAllMachines, Machine, getAllActivationHistory, ActivationHistory, createTransaction, getBillingData, Transaction, BillingData } from '@/lib/database';
 
 interface ActivationHistoryWithMachine extends ActivationHistory {
@@ -30,7 +32,7 @@ type MachineStats = {
   created_at: string | null;
 };
 
-type DashboardView = 'adicionar_credito' | 'faturamento' | 'historico_acionamentos' | 'equipamentos' | 'alterar_senha' | 'adicionar_maquina' | 'historico_caixa';
+type DashboardView = 'adicionar_credito' | 'faturamento' | 'historico_acionamentos' | 'equipamentos' | 'alterar_senha' | 'adicionar_maquina' | 'historico_caixa' | 'importar_excel';
 
 export default function Dashboard() {
   const searchParams = useSearchParams();
@@ -58,7 +60,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const view = searchParams.get('view');
-    if (view && ['faturamento', 'historico_acionamentos', 'equipamentos', 'alterar_senha', 'adicionar_maquina', 'historico_caixa'].includes(view)) {
+    if (view && ['faturamento', 'historico_acionamentos', 'equipamentos', 'alterar_senha', 'adicionar_maquina', 'historico_caixa', 'importar_excel'].includes(view)) {
       setCurrentView(view as DashboardView);
     } else {
       setCurrentView('adicionar_credito');
@@ -1562,6 +1564,23 @@ export default function Dashboard() {
           <>
             <h2 className="text-3xl font-bold text-gray-900 mb-6">Histórico do Caixa</h2>
             <CashHistoryPage />
+          </>
+        );
+
+      case 'importar_excel':
+        return (
+          <>
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">Importar Dados Excel</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">1️⃣ Gerar Planilha Modelo</h3>
+                <ExcelTemplateGenerator />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">2️⃣ Importar Planilha Preenchida</h3>
+                <ExcelUploader />
+              </div>
+            </div>
           </>
         );
 
