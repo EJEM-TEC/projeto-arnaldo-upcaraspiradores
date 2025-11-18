@@ -71,11 +71,11 @@ export default function Dashboard() {
       if (currentView === 'equipamentos' || currentView === 'adicionar_maquina') {
         setLoadingMachines(true);
         try {
-        const { data, error } = await getAllMachines();
+          const { data, error } = await getAllMachines();
           console.log('Resultado getAllMachines:', { data, error });
-          
-        if (error) {
-          console.error('Erro ao buscar máquinas:', error);
+
+          if (error) {
+            console.error('Erro ao buscar máquinas:', error);
             const supabaseError = error as unknown as SupabaseError;
             console.error('Detalhes do erro:', {
               message: error.message,
@@ -85,15 +85,15 @@ export default function Dashboard() {
             });
             // Ainda assim, tenta definir como array vazio para não quebrar
             setMachines([]);
-        } else {
+          } else {
             console.log('Máquinas encontradas:', data);
-          setMachines(data || []);
-        }
+            setMachines(data || []);
+          }
         } catch (err) {
           console.error('Erro inesperado ao buscar máquinas:', err);
           setMachines([]);
         } finally {
-        setLoadingMachines(false);
+          setLoadingMachines(false);
         }
       }
     };
@@ -107,7 +107,7 @@ export default function Dashboard() {
       if (currentView === 'historico_acionamentos') {
         setLoadingHistory(true);
         const startIso = historyStart ? new Date(historyStart).toISOString() : undefined;
-        const endIso = historyEnd ? new Date(new Date(historyEnd).setHours(23,59,59,999)).toISOString() : undefined;
+        const endIso = historyEnd ? new Date(new Date(historyEnd).setHours(23, 59, 59, 999)).toISOString() : undefined;
         const { data, error } = await getAllActivationHistory(startIso, endIso);
         if (error) {
           console.error('Erro ao buscar histórico de acionamentos:', error);
@@ -199,10 +199,10 @@ export default function Dashboard() {
     try {
       const { getUserFullName } = await import('@/lib/database');
       const { data: userProfile } = await getUserFullName(id);
-      
+
       // Debug log
       console.log('Fetched user profile:', { id, userProfile });
-      
+
       if (userProfile?.full_name) {
         console.log('Setting client name to:', userProfile.full_name);
         setClientName(userProfile.full_name);
@@ -228,15 +228,15 @@ export default function Dashboard() {
     try {
       const { getActivationHistoryByMachine } = await import('@/lib/database');
       const { data: history } = await getActivationHistoryByMachine(machineId);
-      
+
       // Tentar importar jsPDF dinamicamente
       type JsPDFModule = {
         default?: {
-          new (): JsPDFInstance;
+          new(): JsPDFInstance;
         };
-        new (): JsPDFInstance;
+        new(): JsPDFInstance;
       };
-      
+
       type JsPDFInstance = {
         setFontSize: (size: number) => void;
         text: (text: string, x: number, y: number, opts?: Record<string, unknown>) => void;
@@ -296,7 +296,7 @@ export default function Dashboard() {
       const totalMinutes = stats?.totalUsageMinutes ?? 0;
       const totalHours = Math.floor(totalMinutes / 60);
       const remainingMinutes = totalMinutes % 60;
-      
+
       doc.text(`Total de Acionamentos: ${stats?.totalActivations ?? 0}`, 14, y); y += 6;
       doc.text(`Tempo Total de Uso: ${totalHours}h ${remainingMinutes}m (${totalMinutes} minutos)`, 14, y); y += 6;
       doc.text(`Temperatura Média: ${stats?.voltage ? 'OK' : '-'}`, 14, y); y += 6;
@@ -312,18 +312,18 @@ export default function Dashboard() {
       doc.setFontSize(10);
       doc.setFillColor(200, 200, 200);
       doc.setDrawColor(100, 100, 100);
-      
+
       const colWidths = [50, 20, 20, 20, 30];
       const cols = ['Data/Hora', 'Comando', 'Duração', 'Temp.', 'Status'];
       let xPos = 14;
-      
+
       doc.setLineWidth(0.1);
       for (let i = 0; i < cols.length; i++) {
         doc.rect(xPos, y - 5, colWidths[i], 6, 'F');
         doc.text(cols[i], xPos + 2, y, { maxWidth: colWidths[i] - 4 });
         xPos += colWidths[i];
       }
-      
+
       y += 8;
       doc.setFillColor(255, 255, 255);
 
@@ -334,9 +334,9 @@ export default function Dashboard() {
           y = 15;
         }
 
-        const start = item.started_at ? new Date(item.started_at).toLocaleString('pt-BR', { 
-          month: '2-digit', 
-          day: '2-digit', 
+        const start = item.started_at ? new Date(item.started_at).toLocaleString('pt-BR', {
+          month: '2-digit',
+          day: '2-digit',
           year: '2-digit',
           hour: '2-digit',
           minute: '2-digit'
@@ -378,11 +378,11 @@ export default function Dashboard() {
 
       type JsPDFModule = {
         default?: {
-          new (): JsPDFInstance;
+          new(): JsPDFInstance;
         };
-        new (): JsPDFInstance;
+        new(): JsPDFInstance;
       };
-      
+
       type JsPDFInstance = {
         setFontSize: (size: number) => void;
         setTextColor: (r: number, g?: number, b?: number) => void;
@@ -413,7 +413,7 @@ export default function Dashboard() {
 
       // ========== PÁGINA 1: SUMÁRIO ==========
       let y = 15;
-      
+
       // Cabeçalho com marca
       doc.setFontSize(16);
       doc.setTextColor(220, 100, 0);
@@ -442,39 +442,39 @@ export default function Dashboard() {
         doc.setFontSize(12);
         doc.setTextColor(100, 100, 100);
         doc.text(title, 14, startY);
-        
+
         let tableY = startY + 7;
         const colWidth = 85;
-        
+
         // Cabeçalho
         doc.setFillColor(220, 220, 220);
         doc.setDrawColor(100, 100, 100);
         doc.setLineWidth(0.5);
         doc.rect(14, tableY - 5, colWidth, 6, 'F');
         doc.rect(14 + colWidth, tableY - 5, colWidth, 6, 'F');
-        
+
         doc.setFontSize(10);
         doc.setTextColor(0, 0, 0);
         doc.text('Descrição', 16, tableY);
         doc.text('Valor', 14 + colWidth + 5, tableY);
-        
+
         tableY += 8;
-        
+
         // Linhas
         doc.setDrawColor(150, 150, 150);
         doc.setLineWidth(0.3);
         doc.setFillColor(255, 255, 255);
         doc.setFontSize(9);
-        
+
         rows.forEach((row) => {
           doc.rect(14, tableY - 5, colWidth, 6);
           doc.rect(14 + colWidth, tableY - 5, colWidth, 6);
-          
+
           doc.text(row[0], 16, tableY, { maxWidth: colWidth - 4 });
           doc.text(row[1], 14 + colWidth + 5, tableY, { maxWidth: colWidth - 4, align: 'right' });
           tableY += 6;
         });
-        
+
         return tableY + 4;
       };
 
@@ -491,7 +491,7 @@ export default function Dashboard() {
       const totalMinutes = stats?.totalUsageMinutes ?? 0;
       const totalHours = Math.floor(totalMinutes / 60);
       const remainingMinutes = totalMinutes % 60;
-      
+
       y = createTable('RESUMO DE FATURAMENTO', [
         ['Total de Acionamentos', `${stats?.totalActivations ?? 0}`],
         ['Tempo Total de Uso', `${totalHours}h ${remainingMinutes}m`],
@@ -506,7 +506,7 @@ export default function Dashboard() {
       const apiracarPercentage = 0.30;
       const apiracarValue = totalAmount * apiracarPercentage;
       const yourValue = totalAmount * (1 - apiracarPercentage);
-      
+
       y = createTable('CÁLCULO DE REPASSE FINANCEIRO', [
         ['Tarifa por Minuto', `R$ ${minuteRate.toFixed(2)}`],
         ['Valor Total', `R$ ${totalAmount.toFixed(2)}`],
@@ -585,12 +585,12 @@ export default function Dashboard() {
 
         const start = item.started_at
           ? new Date(item.started_at).toLocaleString('pt-BR', {
-              month: '2-digit',
-              day: '2-digit',
-              year: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
+            month: '2-digit',
+            day: '2-digit',
+            year: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
           : '-';
         const cmd = item.command === 'on' ? 'Ligado' : item.command === 'off' ? 'Desligado' : item.command || '-';
         const dur = item.duration_minutes != null ? `${item.duration_minutes}m` : '-';
@@ -635,7 +635,7 @@ export default function Dashboard() {
     });
 
     const csv = [headers.join(','), ...rows].join('\n');
-    
+
     // Download
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -658,11 +658,11 @@ export default function Dashboard() {
 
       type JsPDFModule = {
         default?: {
-          new (): JsPDFInstance;
+          new(): JsPDFInstance;
         };
-        new (): JsPDFInstance;
+        new(): JsPDFInstance;
       };
-      
+
       type JsPDFInstance = {
         setFontSize: (size: number) => void;
         setTextColor: (r: number, g?: number, b?: number) => void;
@@ -690,7 +690,7 @@ export default function Dashboard() {
 
       // ========== PÁGINA 1: SUMÁRIO ==========
       let y = 15;
-      
+
       // Cabeçalho com marca
       doc.setFontSize(16);
       doc.setTextColor(220, 100, 0);
@@ -729,39 +729,39 @@ export default function Dashboard() {
         doc.setFontSize(12);
         doc.setTextColor(100, 100, 100);
         doc.text(title, 14, startY);
-        
+
         let tableY = startY + 7;
         const colWidth = 85;
-        
+
         // Cabeçalho
         doc.setFillColor(220, 220, 220);
         doc.setDrawColor(100, 100, 100);
         doc.setLineWidth(0.5);
         doc.rect(14, tableY - 5, colWidth, 6, 'F');
         doc.rect(14 + colWidth, tableY - 5, colWidth, 6, 'F');
-        
+
         doc.setFontSize(10);
         doc.setTextColor(0, 0, 0);
         doc.text('Descrição', 16, tableY);
         doc.text('Valor', 14 + colWidth + 5, tableY);
-        
+
         tableY += 8;
-        
+
         // Linhas
         doc.setDrawColor(150, 150, 150);
         doc.setLineWidth(0.3);
         doc.setFillColor(255, 255, 255);
         doc.setFontSize(9);
-        
+
         rows.forEach((row) => {
           doc.rect(14, tableY - 5, colWidth, 6);
           doc.rect(14 + colWidth, tableY - 5, colWidth, 6);
-          
+
           doc.text(row[0], 16, tableY, { maxWidth: colWidth - 4 });
           doc.text(row[1], 14 + colWidth + 5, tableY, { maxWidth: colWidth - 4, align: 'right' });
           tableY += 6;
         });
-        
+
         return tableY + 4;
       };
 
@@ -852,12 +852,12 @@ export default function Dashboard() {
 
         const start = item.started_at
           ? new Date(item.started_at).toLocaleString('pt-BR', {
-              month: '2-digit',
-              day: '2-digit',
-              year: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
+            month: '2-digit',
+            day: '2-digit',
+            year: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
           : '-';
         const machineData = item as ActivationHistoryWithMachine;
         const machineId = String(item.machine_id || '-');
@@ -1016,7 +1016,6 @@ export default function Dashboard() {
                       <option value="credit-card">Cartão de Crédito</option>
                       <option value="debit-card">Cartão de Débito</option>
                       <option value="pix">PIX</option>
-                      <option value="cash">Dinheiro</option>
                     </select>
                   </div>
 
@@ -1119,7 +1118,7 @@ export default function Dashboard() {
                             const minuteRate = 0.50;
                             const totalAmount = totalMinutes * minuteRate;
                             const repaymentValue = totalAmount * 0.70;
-                            
+
                             return (
                               <tr key={machine.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-semibold text-gray-900">#{machine.id}</td>
@@ -1223,7 +1222,7 @@ export default function Dashboard() {
         return (
           <>
             <h2 className="text-3xl font-bold text-gray-900 mb-6">Histórico de Acionamentos</h2>
-            
+
             <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
               <div className="flex flex-col md:flex-row md:items-end md:space-x-4 gap-4">
                 <div>
@@ -1450,15 +1449,15 @@ export default function Dashboard() {
 
                         return (
                           <>
-                          <tr key={machine.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{machine.id}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{machine.location || 'Não especificada'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
-                                {statusText}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{createdAt}</td>
+                            <tr key={machine.id}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{machine.id}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{machine.location || 'Não especificada'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
+                                  {statusText}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{createdAt}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                                 <button onClick={() => toggleExpand(machine.id)} className="text-orange-600 hover:text-orange-800">
                                   {expandedMachines[machine.id] ? 'Fechar' : 'Detalhes'}
