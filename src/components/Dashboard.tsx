@@ -614,39 +614,63 @@ export default function Dashboard() {
     }
   };
 
-  const handleDownloadHistoryData = () => {
+  const handleDownloadHistoryData = async () => {
     if (activationHistory.length === 0) {
       alert('Nenhum dado de histórico para baixar. Filtre dados primeiro.');
       return;
     }
 
-    // Criar CSV
-    const headers = ['ID', 'Máquina ID', 'Localização', 'Data/Hora Início', 'Comando', 'Duração (min)', 'Temperatura Média', 'Status'];
-    const rows = activationHistory.map((item) => {
-      const activationWithMachine = item as ActivationHistoryWithMachine;
-      const machineLocation = activationWithMachine.machines?.location || '-';
-      const startDate = item.started_at ? new Date(item.started_at).toLocaleString('pt-BR') : '-';
-      const cmd = item.command === 'on' ? 'Ligado' : item.command === 'off' ? 'Desligado' : item.command || '-';
-      const dur = item.duration_minutes != null ? item.duration_minutes : '-';
-      const temp = item.average_temperature != null ? item.average_temperature.toFixed(1) : '-';
-      const status = item.status || '-';
+    try {
+      const XLSX = await import('xlsx');
+      
+      // Preparar os dados
+      const data = activationHistory.map((item) => {
+        const activationWithMachine = item as ActivationHistoryWithMachine;
+        const machineLocation = activationWithMachine.machines?.location || '-';
+        const startDate = item.started_at ? new Date(item.started_at).toLocaleString('pt-BR') : '-';
+        const cmd = item.command === 'on' ? 'Ligado' : item.command === 'off' ? 'Desligado' : item.command || '-';
+        const dur = item.duration_minutes != null ? item.duration_minutes : '-';
+        const temp = item.average_temperature != null ? item.average_temperature.toFixed(1) : '-';
+        const status = item.status || '-';
 
-      return [item.id, item.machine_id, machineLocation, startDate, cmd, dur, temp, status].map(v => `"${v}"`).join(',');
-    });
+        return {
+          'ID': item.id,
+          'Máquina ID': item.machine_id,
+          'Localização': machineLocation,
+          'Data/Hora Início': startDate,
+          'Comando': cmd,
+          'Duração (min)': dur,
+          'Temperatura Média (°C)': temp,
+          'Status': status
+        };
+      });
 
-    const csv = [headers.join(','), ...rows].join('\n');
-    
-    // Download
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    const dateStr = new Date().toISOString().split('T')[0];
-    link.setAttribute('href', url);
-    link.setAttribute('download', `historico_acionamentos_${dateStr}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      // Criar workbook e adicionar worksheet
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      
+      // Ajustar largura das colunas
+      const columnWidths = [
+        { wch: 10 },  // ID
+        { wch: 12 },  // Máquina ID
+        { wch: 20 },  // Localização
+        { wch: 20 },  // Data/Hora
+        { wch: 12 },  // Comando
+        { wch: 14 },  // Duração
+        { wch: 18 },  // Temperatura
+        { wch: 12 }   // Status
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Histórico');
+      
+      // Fazer download
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `historico_acionamentos_${dateStr}.xlsx`);
+    } catch (error) {
+      console.error('Erro ao gerar arquivo Excel:', error);
+      alert('Erro ao gerar arquivo Excel');
+    }
   };
 
   const handleDownloadRepaymentReport = async () => {
@@ -1238,9 +1262,9 @@ export default function Dashboard() {
                   <button
                     onClick={handleDownloadHistoryData}
                     disabled={activationHistory.length === 0}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium"
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium"
                   >
-                    ⬇️ Baixar CSV
+                    📊 Baixar Excel
                   </button>
                   <button
                     onClick={handleDownloadRepaymentReport}
