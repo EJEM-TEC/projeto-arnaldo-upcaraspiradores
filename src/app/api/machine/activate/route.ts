@@ -4,7 +4,6 @@ import {
   decrementUserBalance, 
   setMachineCommand, 
   createActivationHistory,
-  getUserBalance,
   updateActivationHistoryWithUser
 } from '@/lib/database';
 
@@ -43,8 +42,12 @@ export async function POST(request: NextRequest) {
     const pricePerMinute = 1;
     const totalPrice = durationMinutes * pricePerMinute;
 
-    // Verifica o saldo do usuário
-    const { data: balanceData, error: balanceError } = await getUserBalance(userId);
+    // Verifica o saldo do usuário - faz query direto com service_role
+    const { data: balanceData, error: balanceError } = await supabaseServer
+      .from('profiles')
+      .select('saldo')
+      .eq('id', userId)
+      .maybeSingle();
     
     if (balanceError) {
       console.error('[ACTIVATE] Error fetching balance:', balanceError);
