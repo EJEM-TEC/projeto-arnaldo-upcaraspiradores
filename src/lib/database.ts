@@ -510,12 +510,14 @@ export async function createTransaction(transaction: {
   description: string;
   payment_method?: string;
 }) {
+  const normalizedAmount = Math.round(Number(transaction.amount) || 0);
+
   const { data, error } = await supabase
     .from('transactions')
     .insert([
       {
         user_id: transaction.user_id || null,
-        amount: transaction.amount,
+        amount: normalizedAmount,
         type: transaction.type,
         description: transaction.description,
         payment_method: transaction.payment_method || null,

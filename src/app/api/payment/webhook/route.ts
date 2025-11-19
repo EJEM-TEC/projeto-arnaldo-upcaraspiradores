@@ -38,6 +38,38 @@ const normalizePaymentMethod = (details: PaymentDetails): string => {
   return 'checkout-pro';
 };
 
+type PaymentDetails = {
+  payment_method_id?: string | null;
+  payment_type_id?: string | null;
+  transaction_amount?: number | null;
+  external_reference?: string | null;
+  metadata?: Record<string, unknown> | null;
+  status?: string | null;
+};
+
+const normalizePaymentMethod = (details: PaymentDetails): string => {
+  const methodId = (details.payment_method_id || '').toLowerCase();
+  const typeId = (details.payment_type_id || '').toLowerCase();
+
+  if (methodId === 'pix' || typeId === 'pix') {
+    return 'pix';
+  }
+
+  if (typeId === 'credit_card') {
+    return 'credit-card';
+  }
+
+  if (typeId === 'debit_card') {
+    return 'debit-card';
+  }
+
+  if (typeId === 'account_money') {
+    return 'app';
+  }
+
+  return 'checkout-pro';
+};
+
 // GET para verificação (Mercado Pago pode fazer GET para validar o endpoint)
 export async function GET(_request: NextRequest) {
   console.log('[WEBHOOK] GET request received - endpoint is active');
@@ -121,6 +153,7 @@ export async function POST(request: NextRequest) {
               // Garante que o valor seja um número inteiro positivo
               const amountToAdd = Math.max(0, Math.round(transactionAmount * 100) / 100);
               
+<<<<<<< HEAD
               // Incrementa o saldo do usuário na tabela profiles usando service_role
               try {
                 // Busca o saldo atual
@@ -153,12 +186,34 @@ export async function POST(request: NextRequest) {
                     console.error(`Error updating balance for user ${userId}:`, updateError);
                   } else {
                     console.log(`Balance incremented successfully for user ${userId}. Previous: ${currentSaldo}, Added: ${amountToAdd}, New: ${balanceData?.saldo}`);
+=======
+              if (amountToAdd > 0) {
+                try {
+                  // Incrementa o saldo do usuário
+                  const { data: balanceData, error: balanceError } = await incrementUserBalance(
+                    userId,
+                    amountToAdd
+                  );
+
+                  if (balanceError) {
+                    console.error(`[WEBHOOK] Error incrementing balance for user ${userId}:`, balanceError);
+                    return NextResponse.json({ 
+                      received: true, 
+                      error: 'Failed to increment balance' 
+                    }, { status: 200 });
+                  } else {
+                    console.log(`[WEBHOOK] ✅ Balance incremented successfully for user ${userId}. New balance: R$ ${balanceData?.saldo}`);
+>>>>>>> refs/remotes/origin/master
                   }
 
                   // Atualiza ou cria a transação no banco
                   if (existingTransaction) {
                     console.log(`[WEBHOOK] Updating existing transaction: ${existingTransaction.id}`);
+<<<<<<< HEAD
                     const { error: updateError } = await supabaseServer
+=======
+                    const { error: updateError } = await supabase
+>>>>>>> refs/remotes/origin/master
                       .from('transactions')
                       .update({
                         description: `Pagamento via ${paymentMethod} - Payment ID: ${paymentId} - Status: ${status}`,
@@ -189,9 +244,21 @@ export async function POST(request: NextRequest) {
                       console.log(`[WEBHOOK] ✅ New transaction created for payment ${paymentId}`);
                     }
                   }
+<<<<<<< HEAD
                 }
               } catch (error) {
                 console.warn(`[WEBHOOK] Error processing approved payment for ${paymentId}:`, error);
+=======
+                } catch (error) {
+                  console.error(`[WEBHOOK] Unexpected error processing approved payment:`, error);
+                  return NextResponse.json({ 
+                    received: true, 
+                    error: 'Unexpected error' 
+                  }, { status: 200 });
+                }
+              } else {
+                console.warn(`[WEBHOOK] Invalid amount for payment ${paymentId}: ${transactionAmount}`);
+>>>>>>> refs/remotes/origin/master
               }
             } else if (status === 'rejected' || status === 'cancelled') {
               console.log(`[WEBHOOK] Payment ${paymentId} ${status} for user ${userId} - Balance not incremented`);
