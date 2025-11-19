@@ -4,10 +4,11 @@ import { useState } from 'react';
 
 interface TimerPageProps {
     amount: string;
-    onStart: (durationMinutes: number) => void;
+    onStart: (durationMinutes: number, machineSlug?: string) => void;
+    machineSlug?: string;
 }
 
-export default function TimerPage({ amount, onStart }: TimerPageProps) {
+export default function TimerPage({ amount, onStart, machineSlug }: TimerPageProps) {
     const [selectedTime, setSelectedTime] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -28,7 +29,7 @@ export default function TimerPage({ amount, onStart }: TimerPageProps) {
         if (selectedTime) {
             setIsLoading(true);
             const durationMinutes = parseInt(selectedTime);
-            await onStart(durationMinutes);
+            await onStart(durationMinutes, machineSlug);
             // isLoading will be reset when timer starts
         }
     };

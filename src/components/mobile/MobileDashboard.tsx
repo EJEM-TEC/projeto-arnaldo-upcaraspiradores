@@ -137,14 +137,17 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
         setCurrentView('timer');
     };
 
-    const handleTimerStart = async (durationMinutes: number) => {
-        console.log('Timer started with duration:', durationMinutes);
+    const handleTimerStart = async (durationMinutes: number, machineSlugParam?: string) => {
+        console.log('Timer started with duration:', durationMinutes, 'Machine slug:', machineSlugParam);
         if (!user) return;
 
         try {
             setAppLoading(true);
             
-            // Chama a API para ativar a máquina (máquina 1 por padrão)
+            // Usa o slug passado ou o padrão
+            const currentMachineSlug = machineSlugParam || machineSlug || '1';
+            
+            // Chama a API para ativar a máquina
             const response = await fetch('/api/machine/activate', {
                 method: 'POST',
                 headers: {
@@ -152,7 +155,7 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
                 },
                 body: JSON.stringify({
                     userId: user.id,
-                    machineId: 1, // ID padrão da máquina
+                    machineSlug: currentMachineSlug, // Usa slug ao invés de ID
                     durationMinutes: durationMinutes
                 })
             });
@@ -182,13 +185,14 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
                     
                     // Desativa a máquina
                     try {
+                        const currentMachineSlug = machineSlugParam || machineSlug || '1';
                         await fetch('/api/machine/deactivate', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                             },
                             body: JSON.stringify({
-                                machineId: 1
+                                machineSlug: currentMachineSlug
                             })
                         });
                     } catch (error) {
@@ -233,6 +237,7 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
                 return <TimerPage
                     amount={balance}
                     onStart={handleTimerStart}
+                    machineSlug={machineSlug}
                 />;
             case 'history':
                 return <HistoryPage />;

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabaseClient';
 import { 
   setMachineCommand,
   updateActivationHistory,
@@ -9,17 +10,36 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { machineId } = body;
+    const { machineId, machineSlug } = body;
 
-    if (!machineId) {
+    if (!machineId && !machineSlug) {
       return NextResponse.json(
-        { error: 'Missing required field: machineId' },
+        { error: 'Missing required field: machineId or machineSlug' },
         { status: 400 }
       );
     }
 
+    // Se tem slug, busca o ID da máquina
+    let actualMachineId = machineId;
+    if (machineSlug && !machineId) {
+      const { data: machineData, error: machineError } = await supabase
+        .from('machines')
+        .select('id')
+        .eq('slug_id', machineSlug)
+        .maybeSingle();
+      
+      if (machineError || !machineData) {
+        console.error('[DEACTIVATE] Error finding machine by slug:', machineError);
+        return NextResponse.json(
+          { error: 'Máquina não encontrada' },
+          { status: 404 }
+        );
+      }
+      actualMachineId = machineData.id;
+    }
+
     // Atualiza o comando da máquina para 'off'
-    const { error: commandError } = await setMachineCommand(machineId, 'off');
+    const { error: commandError } = await setMachineCommand(actualMachineId, 'off');
 
     if (commandError) {
       console.error('Error setting machine command to off:', commandError);
@@ -30,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Busca o último registro de ativação que está em andamento
-    const { data: historyData, error: historyError } = await getActivationHistoryByMachine(machineId);
+    const { data: historyData, error: historyError } = await getActivationHistoryByMachine(actualMachineId);
 
     if (!historyError && historyData && historyData.length > 0) {
       // Encontra o registro que está em andamento
@@ -51,9 +71,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: true,
-            message: `Máquina ${machineId} desativada`,
+            message: `Máquina ${actualMachineId} desativada`,
             durationMinutes,
-            machineId
+            machineId: actualMachineId
           },
           { status: 200 }
         );
@@ -64,8 +84,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: `Máquina ${machineId} desativada`,
-        machineId
+        message: `Máquina ${actualMachineId} desativada`,
+        machineId: actualMachineId
       },
       { status: 200 }
     );

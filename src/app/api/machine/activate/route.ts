@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { supabaseServer } from '@/lib/supabaseServer';
 import { 
   decrementUserBalance, 
   setMachineCommand, 
@@ -10,13 +11,32 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, machineId, durationMinutes } = body;
+    const { userId, machineSlug, machineId, durationMinutes } = body;
 
-    if (!userId || !machineId || !durationMinutes) {
+    if (!userId || (!machineSlug && !machineId) || !durationMinutes) {
       return NextResponse.json(
-        { error: 'Missing required fields: userId, machineId, durationMinutes' },
+        { error: 'Missing required fields: userId, (machineSlug or machineId), durationMinutes' },
         { status: 400 }
       );
+    }
+
+    // Se tem slug, busca o ID da máquina
+    let actualMachineId = machineId;
+    if (machineSlug && !machineId) {
+      const { data: machineData, error: machineError } = await supabaseServer
+        .from('machines')
+        .select('id')
+        .eq('slug_id', machineSlug)
+        .maybeSingle();
+      
+      if (machineError || !machineData) {
+        console.error('[ACTIVATE] Error finding machine by slug:', machineError);
+        return NextResponse.json(
+          { error: 'Máquina não encontrada' },
+          { status: 404 }
+        );
+      }
+      actualMachineId = machineData.id;
     }
 
     // Calcula o preço (R$ 1 por minuto, pode ser ajustado)
@@ -70,7 +90,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Atualiza o comando da máquina para 'on'
-    const { error: commandError } = await setMachineCommand(machineId, 'on');
+    const { error: commandError } = await setMachineCommand(actualMachineId, 'on');
 
     if (commandError) {
       console.error('Error setting machine command:', commandError);
@@ -84,7 +104,7 @@ export async function POST(request: NextRequest) {
 
     // Cria um registro de ativação
     const { data: historyData, error: historyError } = await createActivationHistory({
-      machine_id: machineId,
+      machine_id: actualMachineId,
       command: 'on',
       started_at: new Date().toISOString(),
       status: 'em_andamento'
@@ -101,11 +121,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: `Máquina ${machineId} ativada por ${durationMinutes} minutos`,
+        message: `Máquina ${actualMachineId} ativada por ${durationMinutes} minutos`,
         durationMinutes,
         totalPrice,
         newBalance: currentBalance - totalPrice,
-        machineId,
+        machineId: actualMachineId,
         activationId: historyData?.id
       },
       { status: 200 }
