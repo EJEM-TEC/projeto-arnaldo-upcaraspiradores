@@ -244,21 +244,9 @@ export async function POST(request: NextRequest) {
                       console.log(`[WEBHOOK] ✅ New transaction created for payment ${paymentId}`);
                     }
                   }
-<<<<<<< HEAD
                 }
               } catch (error) {
                 console.warn(`[WEBHOOK] Error processing approved payment for ${paymentId}:`, error);
-=======
-                } catch (error) {
-                  console.error(`[WEBHOOK] Unexpected error processing approved payment:`, error);
-                  return NextResponse.json({ 
-                    received: true, 
-                    error: 'Unexpected error' 
-                  }, { status: 200 });
-                }
-              } else {
-                console.warn(`[WEBHOOK] Invalid amount for payment ${paymentId}: ${transactionAmount}`);
->>>>>>> refs/remotes/origin/master
               }
             } else if (status === 'rejected' || status === 'cancelled') {
               console.log(`[WEBHOOK] Payment ${paymentId} ${status} for user ${userId} - Balance not incremented`);

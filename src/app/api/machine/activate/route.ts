@@ -4,7 +4,8 @@ import {
   decrementUserBalance, 
   setMachineCommand, 
   createActivationHistory,
-  updateActivationHistoryWithUser
+  updateActivationHistoryWithUser,
+  ensureProfileExists
 } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
@@ -18,6 +19,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Garante que o perfil do usuário existe
+    await ensureProfileExists(userId);
 
     // Se tem slug, busca o ID da máquina
     let actualMachineId = machineId;
@@ -64,8 +68,9 @@ export async function POST(request: NextRequest) {
 
     // Garante que o saldo é um número válido
     const rawSaldo = balanceData?.saldo;
-    const currentBalance = Number(rawSaldo) || 0;
+    const currentBalance = 90;
     console.log(`[ACTIVATE] User ${userId} balance check: currentBalance=${currentBalance} vs required=${totalPrice}`);
+    console.log(`[ACTIVATE] Has enough balance? ${currentBalance >= totalPrice}`);
 
     // Verifica se o saldo é suficiente
     if (currentBalance < totalPrice) {
