@@ -6,6 +6,7 @@ import DashboardLayout from './DashboardLayout';
 import MudarSenhaForm from './mudar-senha';
 import { AddMachineForm } from './AddMachineForm';
 import CashHistoryPage from '@/components/pages/CashHistoryPage';
+import { supabase } from '@/lib/supabaseClient';
 import { getAllMachines, Machine, getAllActivationHistory, ActivationHistory, createTransaction, getBillingData, Transaction, BillingData } from '@/lib/database';
 
 interface ActivationHistoryWithMachine extends ActivationHistory {
@@ -32,6 +33,115 @@ type MachineStats = {
 
 type DashboardView = 'adicionar_credito' | 'faturamento' | 'historico_acionamentos' | 'equipamentos' | 'alterar_senha' | 'adicionar_maquina' | 'historico_caixa';
 
+const MINUTE_RATE = 0.5;
+
+type RevenueSummaryKey = 'posto' | 'app' | 'pix' | 'cartao';
+type RevenueSummary = Record<RevenueSummaryKey, number>;
+
+const INITIAL_REVENUE_SUMMARY: RevenueSummary = {
+  posto: 0,
+  app: 0,
+  pix: 0,
+  cartao: 0,
+};
+
+interface FinancialHistoryRow {
+  equipamento: string;
+  tempoEmMin: number;
+  valorPorAspira: number;
+  quantidade: number;
+  saldoUtilizado: number;
+}
+
+const roundTwo = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+const getDurationMinutes = (activation: ActivationHistory) => {
+  if (typeof activation.duration_minutes === 'number') {
+    return activation.duration_minutes;
+  }
+
+  if (activation.started_at && activation.ended_at) {
+    const start = new Date(activation.started_at);
+    const end = new Date(activation.ended_at);
+    const diffMinutes = Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
+    return diffMinutes;
+  }
+
+  return 0;
+};
+
+const getMachineDisplayName = (activation: ActivationHistoryWithMachine) => {
+  const location = activation.machines?.location?.trim();
+  return location
+    ? `Aspirador #${activation.machine_id} - ${location}`
+    : `Aspirador #${activation.machine_id}`;
+};
+
+const buildHistoryRows = (history: ActivationHistory[]): FinancialHistoryRow[] => {
+  return history.map((activation) => {
+    const duration = roundTwo(getDurationMinutes(activation));
+    const valorPorAspira = MINUTE_RATE;
+    const saldoUtilizado = roundTwo(duration * MINUTE_RATE);
+    return {
+      equipamento: getMachineDisplayName(activation as ActivationHistoryWithMachine),
+      tempoEmMin: duration,
+      valorPorAspira,
+      quantidade: 1,
+      saldoUtilizado,
+    };
+  });
+};
+
+const mapPaymentMethodToSummaryKey = (method?: string | null): RevenueSummaryKey => {
+  const normalized = (method || '').toLowerCase();
+  if (['pix', 'pix_qr', 'pix-app', 'pix app'].includes(normalized)) {
+    return 'pix';
+  }
+  if (['credit-card', 'debit-card', 'card', 'visa', 'mastercard', 'amex', 'elo'].includes(normalized)) {
+    return 'cartao';
+  }
+  if (['posto', 'cash', 'dinheiro', 'presencial', 'balcao'].includes(normalized)) {
+    return 'posto';
+  }
+  return 'app';
+};
+
+const buildRevenueSummary = (
+  transactions: Array<{ amount: number | null; payment_method: string | null }>
+): RevenueSummary => {
+  return transactions.reduce((acc, transaction) => {
+    const key = mapPaymentMethodToSummaryKey(transaction.payment_method);
+    acc[key] += transaction.amount || 0;
+    return acc;
+  }, { ...INITIAL_REVENUE_SUMMARY });
+};
+
+const buildWorksheetMatrix = (summary: RevenueSummary, rows: FinancialHistoryRow[]) => {
+  const headerRow = ['Equipamento', 'Tempo em min', 'Valor por aspira', 'Quantidade', 'Saldo utilizado'];
+  const dataRows = rows.map((row) => [
+    row.equipamento,
+    row.tempoEmMin,
+    row.valorPorAspira,
+    row.quantidade,
+    row.saldoUtilizado,
+  ]);
+
+  return [
+    ['Receita POSTO', 'Receita APP', 'Receita PIX', 'Receita CARTÃO'],
+    [
+      roundTwo(summary.posto),
+      roundTwo(summary.app),
+      roundTwo(summary.pix),
+      roundTwo(summary.cartao),
+    ],
+    [],
+    [],
+    headerRow,
+    ...dataRows,
+  ];
+};
+
+
 export default function Dashboard() {
   const searchParams = useSearchParams();
   const [currentView, setCurrentView] = useState<DashboardView>('adicionar_credito');
@@ -51,10 +161,10 @@ export default function Dashboard() {
   const [historyEnd, setHistoryEnd] = useState<string>('');
   const [expandedMachines, setExpandedMachines] = useState<Record<number, boolean>>({});
   const [machineStats, setMachineStats] = useState<Record<number, MachineStats>>({});
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_cashHistoryStart, _setCashHistoryStart] = useState<string>('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_cashHistoryEnd, _setCashHistoryEnd] = useState<string>('');
+  const [exportingHistory, setExportingHistory] = useState(false);
+  const [revenueSummary, setRevenueSummary] = useState<RevenueSummary>(INITIAL_REVENUE_SUMMARY);
 
   useEffect(() => {
     const view = searchParams.get('view');
@@ -119,6 +229,47 @@ export default function Dashboard() {
     };
 
     fetchActivationHistory();
+  }, [currentView, historyStart, historyEnd]);
+
+  useEffect(() => {
+    const fetchRevenueSummary = async () => {
+      if (currentView !== 'historico_acionamentos') {
+        return;
+      }
+
+      try {
+        const startIso = historyStart ? new Date(historyStart).toISOString() : undefined;
+        const endIso = historyEnd
+          ? new Date(new Date(historyEnd).setHours(23, 59, 59, 999)).toISOString()
+          : undefined;
+
+        let query = supabase
+          .from('transactions')
+          .select('amount,payment_method,created_at')
+          .eq('type', 'entrada');
+
+        if (startIso) {
+          query = query.gte('created_at', startIso);
+        }
+        if (endIso) {
+          query = query.lte('created_at', endIso);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+          console.error('Erro ao buscar resumo financeiro:', error);
+          setRevenueSummary(INITIAL_REVENUE_SUMMARY);
+          return;
+        }
+
+        setRevenueSummary(buildRevenueSummary(data || []));
+      } catch (err) {
+        console.error('Erro inesperado ao calcular resumo financeiro:', err);
+        setRevenueSummary(INITIAL_REVENUE_SUMMARY);
+      }
+    };
+
+    fetchRevenueSummary();
   }, [currentView, historyStart, historyEnd]);
 
 
@@ -528,7 +679,6 @@ export default function Dashboard() {
       const pageHeight = 280;
       const headerHeight = 8;
       const margin = 10;
-      const contentWidth = 210 - 2 * margin;
 
       // Colunas: [label, width]
       const columns = [
@@ -574,7 +724,7 @@ export default function Dashboard() {
 
       // Render rows
       const rows = (history || []).slice(0, 500);
-      rows.forEach((item, index) => {
+      rows.forEach((item, _index) => {
         // Verifica se precisa de nova página
         if (y + rowHeight > pageHeight) {
           doc.addPage();
@@ -614,39 +764,60 @@ export default function Dashboard() {
     }
   };
 
-  const handleDownloadHistoryData = () => {
+  const handleDownloadHistoryData = async () => {
     if (activationHistory.length === 0) {
       alert('Nenhum dado de histórico para baixar. Filtre dados primeiro.');
       return;
     }
 
-    // Criar CSV
-    const headers = ['ID', 'Máquina ID', 'Localização', 'Data/Hora Início', 'Comando', 'Duração (min)', 'Temperatura Média', 'Status'];
-    const rows = activationHistory.map((item) => {
-      const activationWithMachine = item as ActivationHistoryWithMachine;
-      const machineLocation = activationWithMachine.machines?.location || '-';
-      const startDate = item.started_at ? new Date(item.started_at).toLocaleString('pt-BR') : '-';
-      const cmd = item.command === 'on' ? 'Ligado' : item.command === 'off' ? 'Desligado' : item.command || '-';
-      const dur = item.duration_minutes != null ? item.duration_minutes : '-';
-      const temp = item.average_temperature != null ? item.average_temperature.toFixed(1) : '-';
-      const status = item.status || '-';
+    if (exportingHistory) {
+      return;
+    }
 
-      return [item.id, item.machine_id, machineLocation, startDate, cmd, dur, temp, status].map(v => `"${v}"`).join(',');
-    });
+    setExportingHistory(true);
+    try {
+      const XLSX = await import('xlsx');
+      const rows = buildHistoryRows(activationHistory);
 
-    const csv = [headers.join(','), ...rows].join('\n');
+      if (rows.length === 0) {
+        alert('Nenhuma linha válida para exportar.');
+        setExportingHistory(false);
+        return;
+      }
 
-    // Download
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    const dateStr = new Date().toISOString().split('T')[0];
-    link.setAttribute('href', url);
-    link.setAttribute('download', `historico_acionamentos_${dateStr}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const worksheetMatrix = buildWorksheetMatrix(revenueSummary, rows);
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetMatrix);
+      worksheet['!cols'] = [
+        { wch: 42 },
+        { wch: 16 },
+        { wch: 18 },
+        { wch: 12 },
+        { wch: 18 },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Relatório');
+
+      const excelBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+      const blob = new Blob([excelBuffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `historico_financeiro_${dateStr}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao gerar planilha XLSX:', error);
+      alert('Não foi possível gerar a planilha. Verifique os dados e tente novamente.');
+    } finally {
+      setExportingHistory(false);
+    }
   };
 
   const handleDownloadRepaymentReport = async () => {
@@ -1236,10 +1407,10 @@ export default function Dashboard() {
                 <div className="flex gap-2">
                   <button
                     onClick={handleDownloadHistoryData}
-                    disabled={activationHistory.length === 0}
+                    disabled={activationHistory.length === 0 || exportingHistory}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium"
                   >
-                    ⬇️ Baixar CSV
+                    {exportingHistory ? 'Gerando...' : '⬇️ Baixar XLSX'}
                   </button>
                   <button
                     onClick={handleDownloadRepaymentReport}
