@@ -83,101 +83,138 @@ export async function POST(request: NextRequest) {
           const status = paymentDetails.status;
           const externalReference = paymentDetails.external_reference || '';
           const transactionAmount = paymentDetails.transaction_amount || 0;
+          const paymentMethod = normalizePaymentMethod(paymentDetails);
           
           console.log(`[WEBHOOK] Payment ${paymentId}:`, {
             status,
             amount: transactionAmount,
             external_reference: externalReference,
+            payment_method: paymentMethod,
             payment_method_id: paymentDetails.payment_method_id,
+            payer_email: paymentDetails.payer?.email,
           });
           
           // Extrai userId do external_reference
           const userMatch = externalReference.match(/USER_([^_]+)/);
           const userId = userMatch ? userMatch[1] : null;
 
-          // Atualiza a transação no banco de dados
           if (userId && userId !== 'guest') {
-            const paymentMethodId = paymentDetails.payment_method_id || 'checkout-pro';
+            console.log(`[WEBHOOK] Processing payment for user: ${userId}`);
             
-            console.log(`[WEBHOOK] Looking for transaction with user_id: ${userId}`);
-            
-            // Busca a transação existente
+            // Busca a transação existente para saber se já foi criada
             const { data: existingTransaction } = await supabase
               .from('transactions')
-              .select('id, amount')
+              .select('id, amount, status')
               .eq('user_id', userId)
-              .or(`description.ilike.%Preference ID:%,description.ilike.%ID: ${paymentId}%`)
+              .or(`description.ilike.%Payment ID: ${paymentId}%`)
               .order('created_at', { ascending: false })
               .limit(1)
               .maybeSingle();
 
-            if (existingTransaction) {
-              console.log(`[WEBHOOK] Found existing transaction: ${existingTransaction.id}`);
-              // Atualiza a transação existente
-              const { error: updateError } = await supabase
-                .from('transactions')
-                .update({
-                  description: `Pagamento via ${paymentMethodId} - Payment ID: ${paymentId} - Status: ${status}`,
-                  amount: transactionAmount || existingTransaction.amount,
-                })
-                .eq('id', existingTransaction.id);
-
-              if (updateError) {
-                console.error('Error updating transaction:', updateError);
-              } else {
-                console.log(`Transaction updated for payment ${paymentId}`);
-              }
-            } else {
-              // Cria uma nova transação se não existir (pode acontecer com checkout-pro)
-              try {
-                await createTransaction({
-                  user_id: userId,
-                  amount: transactionAmount,
-                  type: 'entrada',
-                  description: `Pagamento via ${paymentMethodId} - Payment ID: ${paymentId} - Status: ${status}`,
-                  payment_method: 'checkout-pro',
-                });
-                console.log(`New transaction created for payment ${paymentId}`);
-              } catch (createError) {
-                console.error('Error creating transaction:', createError);
-              }
-            }
-
-            // Se o pagamento foi aprovado, incrementa o saldo do usuário
+            // Se o pagamento foi aprovado, processa
             if (status === 'approved') {
-              console.log(`Payment ${paymentId} approved for user ${userId}`);
+              console.log(`[WEBHOOK] Payment ${paymentId} approved for user ${userId} - Amount: R$ ${transactionAmount}`);
               
-              // Garante que o valor seja um inteiro (em centavos, convertemos para reais)
-              // transactionAmount vem em reais (ex: 5.00), mas precisamos garantir que seja inteiro
-              const amountToAdd = Math.round(transactionAmount);
+              // Garante que o valor seja um número inteiro positivo
+              const amountToAdd = Math.max(0, Math.round(transactionAmount * 100) / 100);
               
-              // Incrementa o saldo do usuário na tabela profiles
-              try {
-                const { data: balanceData, error: balanceError } = await incrementUserBalance(
-                  userId,
-                  amountToAdd
-                );
+              if (amountToAdd > 0) {
+                try {
+                  // Incrementa o saldo do usuário
+                  const { data: balanceData, error: balanceError } = await incrementUserBalance(
+                    userId,
+                    amountToAdd
+                  );
 
-                if (balanceError) {
-                  console.error(`Error incrementing balance for user ${userId}:`, balanceError);
-                } else {
-                  console.log(`Balance incremented successfully for user ${userId}. New balance: ${balanceData?.saldo}`);
+                  if (balanceError) {
+                    console.error(`[WEBHOOK] Error incrementing balance for user ${userId}:`, balanceError);
+                    return NextResponse.json({ 
+                      received: true, 
+                      error: 'Failed to increment balance' 
+                    }, { status: 200 });
+                  } else {
+                    console.log(`[WEBHOOK] ✅ Balance incremented successfully for user ${userId}. New balance: R$ ${balanceData?.saldo}`);
+                  }
+
+                  // Atualiza ou cria a transação no banco
+                  if (existingTransaction) {
+                    console.log(`[WEBHOOK] Updating existing transaction: ${existingTransaction.id}`);
+                    const { error: updateError } = await supabase
+                      .from('transactions')
+                      .update({
+                        description: `Pagamento via ${paymentMethod} - Payment ID: ${paymentId} - Status: ${status}`,
+                        amount: amountToAdd,
+                        payment_method: paymentMethod,
+                        status: 'completed',
+                      })
+                      .eq('id', existingTransaction.id);
+
+                    if (updateError) {
+                      console.error(`[WEBHOOK] Error updating transaction:`, updateError);
+                    } else {
+                      console.log(`[WEBHOOK] ✅ Transaction updated for payment ${paymentId}`);
+                    }
+                  } else {
+                    console.log(`[WEBHOOK] Creating new transaction for payment ${paymentId}`);
+                    const { error: createError } = await createTransaction({
+                      user_id: userId,
+                      amount: amountToAdd,
+                      type: 'entrada',
+                      description: `Pagamento via ${paymentMethod} - Payment ID: ${paymentId} - Status: ${status}`,
+                      payment_method: paymentMethod,
+                    });
+
+                    if (createError) {
+                      console.error(`[WEBHOOK] Error creating transaction:`, createError);
+                    } else {
+                      console.log(`[WEBHOOK] ✅ New transaction created for payment ${paymentId}`);
+                    }
+                  }
+                } catch (error) {
+                  console.error(`[WEBHOOK] Unexpected error processing approved payment:`, error);
+                  return NextResponse.json({ 
+                    received: true, 
+                    error: 'Unexpected error' 
+                  }, { status: 200 });
                 }
-              } catch (balanceError) {
-                console.error(`Unexpected error incrementing balance for user ${userId}:`, balanceError);
+              } else {
+                console.warn(`[WEBHOOK] Invalid amount for payment ${paymentId}: ${transactionAmount}`);
               }
             } else if (status === 'rejected' || status === 'cancelled') {
-              console.log(`Payment ${paymentId} ${status} for user ${userId} - Balance not incremented`);
+              console.log(`[WEBHOOK] Payment ${paymentId} ${status} for user ${userId} - Balance not incremented`);
+              
+              // Atualiza a transação com status rejeitado
+              if (existingTransaction) {
+                await supabase
+                  .from('transactions')
+                  .update({
+                    status: status === 'rejected' ? 'rejected' : 'cancelled',
+                    description: `Pagamento via ${paymentMethod} - Payment ID: ${paymentId} - Status: ${status}`,
+                  })
+                  .eq('id', existingTransaction.id);
+              }
             } else if (status === 'pending' || status === 'in_process') {
-              console.log(`Payment ${paymentId} ${status} for user ${userId} - Waiting for approval`);
+              console.log(`[WEBHOOK] Payment ${paymentId} ${status} for user ${userId} - Waiting for approval`);
+              
+              // Atualiza a transação com status pendente
+              if (existingTransaction) {
+                await supabase
+                  .from('transactions')
+                  .update({
+                    status: 'pending',
+                    description: `Pagamento via ${paymentMethod} - Payment ID: ${paymentId} - Status: ${status}`,
+                  })
+                  .eq('id', existingTransaction.id);
+              }
             }
+          } else {
+            console.log(`[WEBHOOK] Payment ${paymentId} with no valid user ID or guest user`);
           }
         } else {
-          console.log(`Payment details not found for ID: ${paymentId}`);
+          console.log(`[WEBHOOK] Payment details not found for ID: ${paymentId}`);
         }
       } catch (fetchError) {
-        console.error('Error fetching payment details:', fetchError);
-        // Continua mesmo com erro, para não bloquear o webhook
+        console.error(`[WEBHOOK] Error fetching payment details:`, fetchError);
       }
     }
 
@@ -186,20 +223,22 @@ export async function POST(request: NextRequest) {
       const preapprovalId = data?.id || body.id;
       
       if (!preapprovalId) {
-        console.log('No preapproval ID found in webhook data');
+        console.log('[WEBHOOK] No preapproval ID found in webhook data');
         return NextResponse.json({ received: true }, { status: 200 });
       }
 
-      console.log(`Preapproval notification received: ${preapprovalId}`);
+      console.log(`[WEBHOOK] Preapproval notification received: ${preapprovalId}`);
+      console.log(`[WEBHOOK] Preapproval status: ${data?.status || 'unknown'}`);
       
       // Aqui você pode adicionar lógica para processar notificações de assinaturas
       // Por exemplo, quando uma cobrança mensal é processada
     }
 
     // Sempre retorna 200 OK para o Mercado Pago
+    console.log(`[WEBHOOK] ✅ Webhook processed successfully`);
     return NextResponse.json({ received: true, processed: true }, { status: 200 });
   } catch (error) {
-    console.error('Error processing webhook:', error);
+    console.error('[WEBHOOK] Error processing webhook:', error);
     
     // Sempre retorna sucesso para o Mercado Pago, mesmo com erro interno
     // para evitar reenvios desnecessários
