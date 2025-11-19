@@ -1,244 +1,246 @@
 #!/usr/bin/env python3
 """
-vacuum_agent.py - Versão SEM SENSOR DE TEMPERATURA
-Controle de aspirador via GPIO com integração no supabase por POLLING.
+vacuum_agent.py - Versão FINAL (Lógica Comando -> Estado)
+- Monitora coluna 'command'.
+- Executa ação nos relés (Pinos 19 e 21).
+- Atualiza coluna 'state' para refletir a realidade.
+- Limpa a coluna 'command' após execução.
 """
 
 import os
 import time
 import logging
-# Corrigido: importando datetime e timezone
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-# collections.deque removido
-
 from gpiozero import OutputDevice
 from supabase import create_client, Client
-# board e adafruit_dht removidos
-from typing import Optional
 
 load_dotenv()
 
-# --- Config Supabase (Lido do .env) ---
+# --- Configurações ---
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 DEVICE_ID = os.getenv("DEVICE_ID", "pi-default")
 TABLE_NAME = "machines"
 HISTORY_TABLE_NAME = "activation_history"
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise SystemExit("Defina SUPABASE_URL e SUPABASE_KEY no .env")
+# Potência (2 Motores = 2400W = 2.4kW)
+VACUUM_POWER_KW = 2.4
 
-# --- Config GPIO (Lido do .env) ---
-RELAY_PIN = int(os.getenv("RELAY_PIN", "17")) # <- Mantido como no seu script
-RELAY_ACTIVE_HIGH = os.getenv("RELAY_ACTIVE_HIGH", "true").lower() in ("1", "true", "yes")
+# GPIOs
+RELAY_MOTOR_A_PIN = int(os.getenv("RELAY_MOTOR_A_PIN", "19"))
+RELAY_MOTOR_B_PIN = int(os.getenv("RELAY_MOTOR_B_PIN", "21"))
 
-# --- Config de Tempo ---
-COMMAND_POLL_INTERVAL = 5.0 # Segundos (checa comandos a cada 5s)
-TELEMETRY_INTERVAL = 60.0  # Segundos (envia dados a cada 60s)
-# TEMP_READING_INTERVAL removido
+# AJUSTE DE LÓGICA DO RELÉ
+# False = Active Low (Liga com 0V). Use este se o relé ligava sozinho antes.
+# True = Active High (Liga com 3.3V).
+RELAY_ACTIVE_HIGH = False 
+
+# Timers
+COMMAND_POLL_INTERVAL = 3.0 # Checa comandos a cada 3s
+TELEMETRY_INTERVAL = 30.0   # Envia dados a cada 30s
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 # --- Inicialização ---
-logging.info("Iniciando serviço de polling do Supabase...")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+logging.info(f"Iniciando AspiraCar Agent. ActiveHigh: {RELAY_ACTIVE_HIGH}")
 
-# Inicializa relé
-relay = OutputDevice(RELAY_PIN, active_high=RELAY_ACTIVE_HIGH, initial_value=False)
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    logging.error(f"Erro fatal ao conectar Supabase: {e}")
+    raise e
 
-# Inicialização do sensor DHT removida
+# Inicializa Relés
+relay_a = OutputDevice(RELAY_MOTOR_A_PIN, active_high=RELAY_ACTIVE_HIGH, initial_value=False)
+relay_b = OutputDevice(RELAY_MOTOR_B_PIN, active_high=RELAY_ACTIVE_HIGH, initial_value=False)
 
+# Variáveis de Estado
 current_state = "off"
-current_activation_id = None  # ID do registro de activation_history atual
-# temperature_readings e last_temp_reading removidos
+current_activation_id = None
+activation_start_time = 0.0
+current_user_id = None
 
-def set_relay(state_on: bool) -> None:
-    """Ativa ou desativa o relé e atualiza o estado global."""
-    global current_state, current_activation_id
+def enforce_hardware_state():
+    """Garante que o hardware esteja sincronizado com a variável current_state."""
+    if current_state == "on":
+        if not relay_a.is_active: relay_a.on()
+        if not relay_b.is_active: relay_b.on()
+    else:
+        if relay_a.is_active: relay_a.off()
+        if relay_b.is_active: relay_b.off()
+
+def set_relay_logic(should_be_on: bool, user_id: str = None):
+    """Aplica a mudança de estado e gerencia o histórico."""
+    global current_state, current_activation_id, activation_start_time, current_user_id
     
-    if state_on and current_state != "on":
-        relay.on()
+    now_utc = datetime.now(timezone.utc).isoformat()
+
+    # --- LIGAR ---
+    if should_be_on and current_state != "on":
+        logging.info(f">>> ATIVANDO MOTORES (Usuário: {user_id})")
         current_state = "on"
-        logging.info("Relay set to ON")
+        current_user_id = user_id
+        activation_start_time = time.time()
+        enforce_hardware_state()
         
-        # Cria registro de activation_history quando liga
+        # Inicia Histórico
         try:
-            # Corrigido: .now(timezone.utc)
-            now = datetime.now(timezone.utc).isoformat()
-            response = supabase.table(HISTORY_TABLE_NAME).insert({
-                "machine_id": int(DEVICE_ID),
+            data = {
+                "machine_id": DEVICE_ID,
+                "user_id": user_id,
                 "command": "on",
-                "started_at": now,
+                "started_at": now_utc,
                 "status": "em_andamento"
-            }).select("id").execute()
-            
-            if response.data and len(response.data) > 0:
-                current_activation_id = response.data[0]["id"]
-                # temperature_readings.clear() removido
-                logging.info(f"Registro de activation criado com ID: {current_activation_id}")
+            }
+            res = supabase.table(HISTORY_TABLE_NAME).insert(data).execute()
+            if res.data:
+                current_activation_id = res.data[0]["id"]
+            else:
+                # Fallback para encontrar o ID
+                rec = supabase.table(HISTORY_TABLE_NAME).select("id").eq("machine_id", DEVICE_ID).order("started_at", desc=True).limit(1).execute()
+                if rec.data: current_activation_id = rec.data[0]["id"]
         except Exception as e:
-            logging.error(f"Erro ao criar registro de activation: {e}")
-            
-    elif not state_on and current_state != "off":
-        relay.off()
+            logging.error(f"Erro histórico (ON): {e}")
+
+    # --- DESLIGAR ---
+    elif not should_be_on and current_state != "off":
+        logging.info(">>> DESATIVANDO MOTORES")
+        current_state = "off"
+        enforce_hardware_state()
         
-        # Finaliza registro de activation_history quando desliga
+        # Finaliza Histórico e Salva Consumo
         if current_activation_id:
             try:
-                # Corrigido: .now(timezone.utc)
-                now = datetime.now(timezone.utc).isoformat()
+                duration_min = int((time.time() - activation_start_time) / 60)
+                consumo_final = round((duration_min / 60) * VACUUM_POWER_KW, 4)
                 
-                # Bloco de cálculo de temperatura média removido
-                
-                # Calcula duração
-                activation_record = supabase.table(HISTORY_TABLE_NAME).select("started_at").eq("id", current_activation_id).single().execute()
-                if activation_record.data:
-                    start_time = datetime.fromisoformat(activation_record.data["started_at"].replace('Z', '+00:00'))
-                    end_time = datetime.fromisoformat(now.replace('Z', '+00:00'))
-                    duration_seconds = (end_time - start_time).total_seconds()
-                    duration_minutes = int(duration_seconds / 60)
-                else:
-                    duration_minutes = None
-                
-                # Atualiza o registro
                 update_data = {
-                    "ended_at": now,
+                    "ended_at": now_utc,
                     "status": "concluído",
-                    "duration_minutes": duration_minutes
+                    "duration_minutes": duration_min,
+                    "consumo_kwh": consumo_final
                 }
-                
-                # Bloco 'if avg_temp' removido
-                
                 supabase.table(HISTORY_TABLE_NAME).update(update_data).eq("id", current_activation_id).execute()
-                logging.info(f"Registro de activation atualizado: {current_activation_id}")
-                
-                # Cria registro de desligamento
-                supabase.table(HISTORY_TABLE_NAME).insert({
-                    "machine_id": int(DEVICE_ID),
-                    "command": "off",
-                    "started_at": now,
-                    "status": "concluído"
-                }).execute()
-                
             except Exception as e:
-                logging.error(f"Erro ao finalizar registro de activation: {e}")
+                logging.error(f"Erro histórico (OFF): {e}")
         
-        current_state = "off"
         current_activation_id = None
-        # temperature_readings.clear() removido
-        logging.info("Relay set to OFF")
+        current_user_id = None
+        activation_start_time = 0.0
 
-def get_telemetry_data() -> dict:
-    """Lê os sensores e retorna um dicionário de dados."""
-    # Toda a lógica do sensor foi removida.
-    
-    return {
-        "temperatura": None, # Retorna Nulo pois não há sensor
-        "horas_de_uso_desde_limpeza": 0.0 # TODO: Implementar esta lógica
-    }
-
-def check_for_commands():
-    """Lê o comando do Supabase e age."""
-    global current_state
+def process_commands():
+    """Lê a coluna 'command', executa e atualiza 'state'."""
     try:
-        resp = supabase.table(TABLE_NAME).select("command").eq("id", DEVICE_ID).limit(1).execute()
-        data = resp.data
-        if data and len(data) > 0:
-            cmd = data[0].get("command")
+        # Busca comando pendente
+        res = supabase.table(TABLE_NAME).select("command, command_user_id").eq("id", DEVICE_ID).limit(1).execute()
+        
+        if res.data and res.data[0].get("command"):
+            row = res.data[0]
+            cmd = row.get("command").lower().strip()
+            user = row.get("command_user_id")
             
-            if not cmd: # Se o comando for None ou "", não faz nada
-                return
+            logging.info(f"Comando recebido: {cmd}")
 
-            cmd_lower = cmd.lower().strip()
-            logging.info(f"Comando recebido do Supabase: {cmd_lower}")
+            if cmd == "on":
+                # 1. Liga Hardware
+                set_relay_logic(True, user_id=user)
+                # 2. Atualiza Banco: Limpa comando e define state='on'
+                supabase.table(TABLE_NAME).update({
+                    "command": None,
+                    "command_user_id": None,
+                    "state": "on"
+                }).eq("id", DEVICE_ID).execute()
+                logging.info("DB Atualizado: state='on'.")
 
-            if cmd_lower == "on" and current_state != "on":
-                logging.info("Comando ON -> Ativando relé")
-                set_relay(True)
-            elif cmd_lower == "off" and current_state != "off":
-                logging.info("Comando OFF -> Desativando relé")
-                set_relay(False)
+            elif cmd == "off":
+                # 1. Desliga Hardware
+                set_relay_logic(False)
+                # 2. Atualiza Banco: Limpa comando e define state='off'
+                supabase.table(TABLE_NAME).update({
+                    "command": None, 
+                    "state": "off"
+                }).eq("id", DEVICE_ID).execute()
+                logging.info("DB Atualizado: state='off'.")
             
-            # MUITO IMPORTANTE: Limpa o comando no banco para não rodar de novo
-            supabase.table(TABLE_NAME).update({"command": None}).eq("id", DEVICE_ID).execute()
-            logging.info("Comando 'command' limpo no Supabase.")
-
+            # Se for outro comando, apenas limpa para não travar
+            else:
+                 supabase.table(TABLE_NAME).update({"command": None}).eq("id", DEVICE_ID).execute()
+                
     except Exception as e:
-        logging.error(f"Erro ao checar comandos no Supabase: {e}")
+        logging.error(f"Erro polling: {e}")
 
-def report_telemetry_and_heartbeat():
-    """Envia os dados dos sensores e o estado atual para o Supabase (Fluxo 2)."""
-    logging.debug("Reportando telemetria e heartbeat...")
-    telemetry = get_telemetry_data()
+def send_telemetry():
+    """Envia heartbeat e dados em tempo real."""
+    global activation_start_time, current_user_id
+    
+    tempo_uso_atual_min = 0
+    consumo_sessao_kwh = 0.0
+
+    if current_state == "on" and activation_start_time > 0:
+        tempo_uso_atual_min = int((time.time() - activation_start_time) / 60)
+        horas = tempo_uso_atual_min / 60
+        consumo_sessao_kwh = round(horas * VACUUM_POWER_KW, 4)
     
     payload = {
         "id": DEVICE_ID,
-        "state": current_state,
         "status": "online",
-        "temperatura": telemetry.get("temperatura"), # Sempre será None
-        "horas_de_uso_desde_limpeza": telemetry.get("horas_de_uso_desde_limpeza"),
-        # Corrigido: .now(timezone.utc)
+        "state": current_state, # Confirmação do estado físico
         "last_seen": datetime.now(timezone.utc).isoformat(),
+        "tempo_uso_sessao_atual": tempo_uso_atual_min,
+        "consumo_sessao_kwh": consumo_sessao_kwh,
+        "current_user_id": current_user_id
     }
     
     try:
         supabase.table(TABLE_NAME).upsert(payload).execute()
-        logging.info(f"Telemetria e Heartbeat enviados: state={current_state}")
     except Exception as e:
-        logging.error(f"Erro ao reportar telemetria: {e}")
+        logging.error(f"Erro telemetria: {e}")
 
-def main_loop():
-    """Loop principal que gerencia o Polling e a Telemetria."""
-    # last_temp_reading removido
+def main():
+    global current_state
+    # Inicia desligado por segurança
+    current_state = "off"
+    enforce_hardware_state()
     
-    last_command_check = 0
-    last_telemetry_report = 0
-    # last_temp_reading = time.time() removido
-
-    logging.info("Iniciando loop principal (Polling). Pressione CTRL+C para sair.")
+    logging.info("Sistema pronto.")
     
-    # Reporta o estado inicial "offline" (ou o estado atual)
-    set_relay(False)
-    report_telemetry_and_heartbeat()
+    # Envia 'oi' inicial e garante state='off' no boot se estava online antes
+    try:
+        supabase.table(TABLE_NAME).upsert({
+            "id": DEVICE_ID, 
+            "status": "online", 
+            "state": "off"
+        }).execute()
+    except: pass
+    
+    last_check = 0
+    last_telemetry = 0
     
     try:
         while True:
-            current_time = time.time()
+            now = time.time()
+            enforce_hardware_state() # Segurança contínua
             
-            # --- Bloco de Checagem de Comandos (Polling) ---
-            if current_time - last_command_check >= COMMAND_POLL_INTERVAL:
-                check_for_commands()
-                last_command_check = current_time
+            # Verifica Comandos
+            if now - last_check >= COMMAND_POLL_INTERVAL:
+                process_commands()
+                last_check = now
             
-            # --- Bloco de Envio de Telemetria (Report) ---
-            if current_time - last_telemetry_report >= TELEMETRY_INTERVAL:
-                report_telemetry_and_heartbeat()
-                last_telemetry_report = current_time
-            
-            # --- Bloco de Leitura de Temperatura (durante execução) ---
-            # Removido
+            # Envia Telemetria
+            if now - last_telemetry >= TELEMETRY_INTERVAL:
+                send_telemetry()
+                last_telemetry = now
                 
-            # Dorme por 1 segundo para não fritar o processador
-            time.sleep(1) 
+            time.sleep(1)
             
     except KeyboardInterrupt:
-        logging.info("Interrupção detectada. Desligando...")
-        set_relay(False)
+        logging.info("Encerrando...")
+        current_state = "off"
+        enforce_hardware_state()
         try:
-            supabase.table(TABLE_NAME).upsert({
-                "id": DEVICE_ID,
-                "state": "off",
-                "status": "offline",
-                # Corrigido: .now(timezone.utc)
-                "last_seen": datetime.now(timezone.utc).isoformat()
-            }).execute()
-        except Exception:
-            pass
-        logging.info("Desligamento concluído.")
-    finally:
-        # dht_sensor.exit() removido
-        pass # Não há mais nada para limpar aqui
+            supabase.table(TABLE_NAME).upsert({"id": DEVICE_ID, "status": "offline", "state": "off"}).execute()
+        except: pass
 
 if __name__ == "__main__":
-    main_loop()
+    main()
