@@ -3,6 +3,38 @@ import { createPaymentClient } from '@/lib/mercadopago';
 import { supabase } from '@/lib/supabaseClient';
 import { createTransaction, incrementUserBalance } from '@/lib/database';
 
+type PaymentDetails = {
+  payment_method_id?: string | null;
+  payment_type_id?: string | null;
+  transaction_amount?: number | null;
+  external_reference?: string | null;
+  metadata?: Record<string, unknown> | null;
+  status?: string | null;
+};
+
+const normalizePaymentMethod = (details: PaymentDetails): string => {
+  const methodId = (details.payment_method_id || '').toLowerCase();
+  const typeId = (details.payment_type_id || '').toLowerCase();
+
+  if (methodId === 'pix' || typeId === 'pix') {
+    return 'pix';
+  }
+
+  if (typeId === 'credit_card') {
+    return 'credit-card';
+  }
+
+  if (typeId === 'debit_card') {
+    return 'debit-card';
+  }
+
+  if (typeId === 'account_money') {
+    return 'app';
+  }
+
+  return 'checkout-pro';
+};
+
 // GET para verificação (Mercado Pago pode fazer GET para validar o endpoint)
 export async function GET(_request: NextRequest) {
   console.log('[WEBHOOK] GET request received - endpoint is active');
@@ -45,7 +77,7 @@ export async function POST(request: NextRequest) {
       // Busca os detalhes do pagamento no Mercado Pago
       try {
         const payment = createPaymentClient();
-        const paymentDetails = await payment.get({ id: Number(paymentId) });
+        const paymentDetails = (await payment.get({ id: Number(paymentId) })) as PaymentDetails;
 
         if (paymentDetails && paymentDetails.id) {
           const status = paymentDetails.status;
