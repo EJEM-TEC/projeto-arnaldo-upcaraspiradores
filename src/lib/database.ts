@@ -773,7 +773,7 @@ export async function decrementUserBalance(userId: string, amount: number) {
   if (newSaldo < 0) {
     return { 
       data: null, 
-      error: { message: 'Saldo insuficiente', code: 'INSUFFICIENT_BALANCE' } as any 
+      error: { message: 'Saldo insuficiente', code: 'INSUFFICIENT_BALANCE' } 
     };
   }
 

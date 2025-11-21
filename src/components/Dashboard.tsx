@@ -6,12 +6,9 @@ import DashboardLayout from './DashboardLayout';
 import MudarSenhaForm from './mudar-senha';
 import { AddMachineForm } from './AddMachineForm';
 import CashHistoryPage from '@/components/pages/CashHistoryPage';
-<<<<<<< HEAD
 import ExcelTemplateGenerator from './ExcelTemplateGenerator';
 import ExcelUploader from './ExcelUploader';
-=======
 import { supabase } from '@/lib/supabaseClient';
->>>>>>> refs/remotes/origin/master
 import { getAllMachines, Machine, getAllActivationHistory, ActivationHistory, createTransaction, getBillingData, Transaction, BillingData } from '@/lib/database';
 
 interface ActivationHistoryWithMachine extends ActivationHistory {
@@ -353,8 +350,11 @@ export default function Dashboard() {
 
     setLoadingClient(true);
     try {
-      const { getUserFullName } = await import('@/lib/database');
-      const { data: userProfile } = await getUserFullName(id);
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
 
       // Debug log
       console.log('Fetched user profile:', { id, userProfile });
@@ -438,7 +438,6 @@ export default function Dashboard() {
       doc.setFontSize(11);
       doc.text(`ID da Máquina: ${machineId}`, 14, y); y += 6;
       doc.text(`Cidade: ${machine?.location || '-'}`, 14, y); y += 6;
-      doc.text(`Endereço: ${machine?.address || '-'}`, 14, y); y += 6;
       doc.text(`Status: ${machine?.status || 'ativo'}`, 14, y); y += 6;
       doc.text(`Cadastrada em: ${stats?.created_at ? new Date(stats.created_at).toLocaleDateString('pt-BR') : '-'}`, 14, y); y += 8;
 
@@ -638,7 +637,6 @@ export default function Dashboard() {
       y = createTable('IDENTIFICAÇÃO', [
         ['ID da Máquina', `#${machineId}`],
         ['Localização', machine?.location || '-'],
-        ['Endereço', machine?.address || '-'],
       ], y);
 
       y += 4;
@@ -775,7 +773,6 @@ export default function Dashboard() {
       return;
     }
 
-<<<<<<< HEAD
     try {
       const XLSX = await import('xlsx');
       
@@ -826,55 +823,6 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Erro ao gerar arquivo Excel:', error);
       alert('Erro ao gerar arquivo Excel');
-=======
-    if (exportingHistory) {
-      return;
-    }
-
-    setExportingHistory(true);
-    try {
-      const XLSX = await import('xlsx');
-      const rows = buildHistoryRows(activationHistory);
-
-      if (rows.length === 0) {
-        alert('Nenhuma linha válida para exportar.');
-        setExportingHistory(false);
-        return;
-      }
-
-      const worksheetMatrix = buildWorksheetMatrix(revenueSummary, rows);
-      const worksheet = XLSX.utils.aoa_to_sheet(worksheetMatrix);
-      worksheet['!cols'] = [
-        { wch: 42 },
-        { wch: 16 },
-        { wch: 18 },
-        { wch: 12 },
-        { wch: 18 },
-      ];
-
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Relatório');
-
-      const excelBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
-      const blob = new Blob([excelBuffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      const dateStr = new Date().toISOString().split('T')[0];
-      link.href = url;
-      link.download = `historico_financeiro_${dateStr}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Erro ao gerar planilha XLSX:', error);
-      alert('Não foi possível gerar a planilha. Verifique os dados e tente novamente.');
-    } finally {
-      setExportingHistory(false);
->>>>>>> refs/remotes/origin/master
     }
   };
 
@@ -1465,17 +1413,10 @@ export default function Dashboard() {
                 <div className="flex gap-2">
                   <button
                     onClick={handleDownloadHistoryData}
-<<<<<<< HEAD
                     disabled={activationHistory.length === 0}
                     className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium"
                   >
                     📊 Baixar Excel
-=======
-                    disabled={activationHistory.length === 0 || exportingHistory}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium"
-                  >
-                    {exportingHistory ? 'Gerando...' : '⬇️ Baixar XLSX'}
->>>>>>> refs/remotes/origin/master
                   </button>
                   <button
                     onClick={handleDownloadRepaymentReport}

@@ -1,4 +1,4 @@
-import { getMachineBySlug } from '@/lib/database';
+import { supabaseServer } from '@/lib/supabaseServer';
 
 export async function GET(request: Request) {
   try {
@@ -14,7 +14,11 @@ export async function GET(request: Request) {
 
     console.log(`[API] Buscando máquina por slug: ${slug}`);
 
-    const { data: machine, error } = await getMachineBySlug(slug);
+    const { data: machine, error } = await supabaseServer
+      .from('machines')
+      .select('*')
+      .eq('slug_id', slug)
+      .maybeSingle();
 
     if (error || !machine) {
       console.log(`[API] Máquina não encontrada: ${slug}`);

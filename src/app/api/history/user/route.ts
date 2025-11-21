@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserActivationHistory } from '@/lib/database';
+import { supabase } from '@/lib/supabaseClient';
 
 interface ActivationHistoryRecord {
   id: number;
@@ -29,7 +29,13 @@ export async function GET(request: NextRequest) {
 
     const limitNumber = limit ? Math.min(parseInt(limit), 100) : 50;
 
-    const { data, error } = await getUserActivationHistory(userId, limitNumber);
+    // Query activation history for the specific user with related machine data
+    const { data, error } = await supabase
+      .from('activation_history')
+      .select('*, machines(*)')
+      .eq('user_id', userId)
+      .order('started_at', { ascending: false })
+      .limit(limitNumber);
 
     if (error) {
       console.error('Error fetching user history:', error);

@@ -3,7 +3,8 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { Machine, getMachineBySlugOrId } from '@/lib/database';
+import { supabase } from '@/lib/supabaseClient';
+import type { Machine } from '@/lib/database';
 
 function HomePageContent() {
   const searchParams = useSearchParams();
@@ -25,7 +26,11 @@ function HomePageContent() {
       setLoading(true);
       setError(null);
       console.log('[HOMEPAGE] Buscando máquina com slug:', slugToLoad);
-      const { data, error: dbError } = await getMachineBySlugOrId(slugToLoad);
+      const { data, error: dbError } = await supabase
+        .from('machines')
+        .select('*')
+        .eq('slug_id', slugToLoad)
+        .maybeSingle();
 
       if (dbError) {
         throw new Error('Erro ao buscar máquina');
@@ -232,18 +237,6 @@ function HomePageContent() {
               <p className="text-gray-400 text-sm">Localização:</p>
               <p className="text-xl font-semibold">{machine.location || 'Não informada'}</p>
             </div>
-
-            <div>
-              <p className="text-gray-400 text-sm">Endereço:</p>
-              <p className="text-xl font-semibold">{machine.address || 'Não informado'}</p>
-            </div>
-
-            {machine.slug_id && (
-              <div>
-                <p className="text-gray-400 text-sm">Código (slug):</p>
-                <p className="text-xl font-semibold">{machine.slug_id}</p>
-              </div>
-            )}
 
             <div>
               <p className="text-gray-400 text-sm">Status:</p>

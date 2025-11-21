@@ -16,6 +16,7 @@ export async function openCheckoutPro({
   amount,
   user,
   cpf,
+  initialBalance,
   onSuccess,
   onError,
 }: CheckoutProOptions): Promise<void> {
