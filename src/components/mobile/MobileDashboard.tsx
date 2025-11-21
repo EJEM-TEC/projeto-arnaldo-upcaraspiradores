@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
-import { useBalance } from '@/hooks/useBalance';
 import LateralMenu from '@/components/LateralMenu';
 import MobileNavbar from '@/components/mobile/MobileNavbar';
 import HomePage from '@/components/mobile/HomePage';
@@ -19,7 +18,6 @@ import HistoryPage from '@/components/mobile/HistoryPage';
 import SupportPage from '@/components/mobile/SupportPage';
 import TermsPage from '@/components/mobile/TermsPage';
 import PrivacyPage from '@/components/mobile/PrivacyPage';
-import WelcomePage from '@/components/mobile/WelcomePage';
 import CheckoutProModal from '@/components/CheckoutProModal';
 
 type MobileView = 'home' | 'balance' | 'add-credit' | 'pix' | 'credit-card' | 'monthly' | 'pix-code' | 'timer' | 'history' | 'support' | 'terms' | 'privacy';
@@ -29,12 +27,14 @@ interface MobileDashboardProps {
 }
 
 export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
-    const [currentView, setCurrentView] = useState<MobileView>('add-credit');
+    const [currentView, setCurrentView] = useState<MobileView>(machineSlug ? 'timer' : 'add-credit');
+    const [balance, setBalance] = useState('0,00');
     const [user, setUser] = useState<User | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [appLoading, setAppLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const [isTimerActive, setIsTimerActive] = useState(false);
+    const [remainingTime, setRemainingTime] = useState(0);
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-    const [showWelcome, setShowWelcome] = useState(false);
     const [paymentData, setPaymentData] = useState<{
         amount: string;
         cpf?: string;
@@ -44,11 +44,9 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
     } | null>(null);
     const router = useRouter();
 
-    // Usar o hook useBalance para atualizar o saldo em tempo real
-    const { balance, loading: balanceLoading } = useBalance(user?.id || null);
-
     useEffect(() => {
         const checkAuth = async () => {
+            // Primeiro tenta obter a sessão
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
             if (sessionError) {
@@ -58,6 +56,7 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
             }
 
             if (!session || !session.user) {
+                // Se não há sessão, tenta obter o usuário diretamente
                 const { data: { user }, error: userError } = await supabase.auth.getUser();
 
                 if (!user || userError) {
@@ -66,46 +65,92 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
                 }
 
                 setUser(user);
-                setAppLoading(false);
-                // Mostrar boas-vindas na primeira visita
-                const hasSeenWelcome = localStorage.getItem(`welcome_${user.id}`);
-                if (!hasSeenWelcome) {
-                    setShowWelcome(true);
-                    localStorage.setItem(`welcome_${user.id}`, 'true');
-                }
+                await fetchBalance(user.id);
+                setLoading(false);
             } else {
                 setUser(session.user);
-                setAppLoading(false);
-                // Mostrar boas-vindas na primeira visita
-                const hasSeenWelcome = localStorage.getItem(`welcome_${session.user.id}`);
-                if (!hasSeenWelcome) {
-                    setShowWelcome(true);
-                    localStorage.setItem(`welcome_${session.user.id}`, 'true');
-                }
+                await fetchBalance(session.user.id);
+                setLoading(false);
             }
         };
 
         checkAuth();
 
+        // Listener para mudanças de autenticação
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
                 setUser(session.user);
-                setAppLoading(false);
-                // Mostrar boas-vindas na primeira visita
-                const hasSeenWelcome = localStorage.getItem(`welcome_${session.user.id}`);
-                if (!hasSeenWelcome) {
-                    setShowWelcome(true);
-                    localStorage.setItem(`welcome_${session.user.id}`, 'true');
-                }
+                fetchBalance(session.user.id);
+                setLoading(false);
             } else {
                 router.push('/login-usuario');
             }
         });
 
-        return () => {
-            subscription.unsubscribe();
-        };
+        return () => subscription.unsubscribe();
     }, [router]);
+
+    // Timer effect
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        
+        if (isTimerActive && remainingTime > 0) {
+            interval = setInterval(() => {
+                setRemainingTime((prev) => {
+                    if (prev <= 1) {
+                        // Timer acabou, desativa a máquina
+                        handleTimerEnd();
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 60000); // Decrementa a cada 1 minuto (60000 ms)
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [isTimerActive, remainingTime]);
+
+    const fetchBalance = async (userId: string) => {
+        try {
+            const response = await fetch(`/api/machine/get-balance?userId=${userId}`);
+            if (response.ok) {
+                const data = await response.json();
+                const balanceValue = data.balance || 0;
+                setBalance(balanceValue.toFixed(2).replace('.', ','));
+            }
+        } catch (error) {
+            console.error('Error fetching balance:', error);
+        }
+    };
+
+    const handleTimerEnd = async () => {
+        setIsTimerActive(false);
+        
+        if (machineSlug && user) {
+            try {
+                // Desativa a máquina
+                const response = await fetch('/api/machine/deactivate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        machineSlug: machineSlug,
+                    }),
+                });
+
+                if (response.ok) {
+                    console.log('Máquina desativada com sucesso');
+                } else {
+                    console.error('Erro ao desativar máquina');
+                }
+            } catch (error) {
+                console.error('Error deactivating machine:', error);
+            }
+        }
+    };
 
     const handlePaymentSelect = (method: string) => {
         switch (method) {
@@ -137,17 +182,20 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
         setCurrentView('timer');
     };
 
-    const handleTimerStart = async (durationMinutes: number, machineSlugParam?: string) => {
-        console.log('Timer started with duration:', durationMinutes, 'Machine slug:', machineSlugParam);
-        if (!user) return;
+    const handleTimerStart = async (durationMinutes: number, selectedMachineSlug?: string) => {
+        if (!user) {
+            alert('Usuário não autenticado');
+            return;
+        }
+
+        const slug = selectedMachineSlug || machineSlug;
+        if (!slug) {
+            alert('Máquina não identificada');
+            return;
+        }
 
         try {
-            setAppLoading(true);
-            
-            // Usa o slug passado ou o padrão
-            const currentMachineSlug = machineSlugParam || machineSlug || '1';
-            
-            // Chama a API para ativar a máquina
+            // Ativa a máquina e debita o saldo
             const response = await fetch('/api/machine/activate', {
                 method: 'POST',
                 headers: {
@@ -155,59 +203,37 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
                 },
                 body: JSON.stringify({
                     userId: user.id,
-                    machineSlug: currentMachineSlug, // Usa slug ao invés de ID
-                    durationMinutes: durationMinutes
-                })
+                    machineSlug: slug,
+                    durationMinutes: durationMinutes,
+                }),
             });
 
+            const data = await response.json();
+
             if (!response.ok) {
-                const errorData = await response.json();
-                alert(`Erro: ${errorData.error}`);
-                setAppLoading(false);
-                // O hook useBalance vai atualizar o saldo automaticamente
+                if (response.status === 402) {
+                    alert(`Saldo insuficiente! ${data.message || ''}`);
+                } else {
+                    alert(data.error || 'Erro ao ativar máquina');
+                }
                 return;
             }
 
-            const data = await response.json();
-            console.log('Machine activated:', data);
+            // Atualiza o saldo
+            if (data.newBalance !== undefined) {
+                setBalance(data.newBalance.toFixed(2).replace('.', ','));
+            } else {
+                await fetchBalance(user.id);
+            }
 
-            // O hook useBalance vai atualizar o saldo automaticamente via realtime
-            setAppLoading(false);
-
-            // Inicia o countdown
-            let remainingSeconds = durationMinutes * 60;
+            // Inicia o timer
+            setRemainingTime(durationMinutes);
+            setIsTimerActive(true);
             
-            const countdownInterval = setInterval(async () => {
-                remainingSeconds--;
-                
-                if (remainingSeconds <= 0) {
-                    clearInterval(countdownInterval);
-                    
-                    // Desativa a máquina
-                    try {
-                        const currentMachineSlug = machineSlugParam || machineSlug || '1';
-                        await fetch('/api/machine/deactivate', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                machineSlug: currentMachineSlug
-                            })
-                        });
-                    } catch (error) {
-                        console.error('Error deactivating machine:', error);
-                    }
-
-                    alert('Tempo de uso expirou! Máquina desativada.');
-                    setCurrentView('home');
-                }
-            }, 1000);
-
+            console.log(`Máquina ativada por ${durationMinutes} minutos`);
         } catch (error) {
-            console.error('Error activating machine:', error);
-            alert('Erro ao ativar a máquina');
-            setAppLoading(false);
+            console.error('Error starting timer:', error);
+            alert('Erro ao ativar máquina. Tente novamente.');
         }
     };
 
@@ -263,10 +289,8 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
     };
 
     const handleCheckoutSuccess = () => {
-        // O hook useBalance vai atualizar o saldo automaticamente via realtime
-        // Não precisa fazer reload da página
-        setShowCheckoutModal(false);
-        setCurrentView('home');
+        // Recarrega a página para atualizar o saldo
+        window.location.reload();
     };
 
     const menuItems = [
@@ -279,7 +303,7 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
         { icon: '📄', text: 'Política de Privacidade', action: () => setCurrentView('privacy') },
     ];
 
-    if (appLoading || balanceLoading) {
+    if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-black px-4">
                 <div className="text-center">
@@ -292,14 +316,6 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
 
     return (
         <div className="min-h-screen bg-black relative">
-            {/* Welcome Modal */}
-            {showWelcome && (
-                <WelcomePage 
-                    onClose={() => setShowWelcome(false)}
-                    autoCloseDelay={5000}
-                />
-            )}
-
             {/* Checkout Pro Modal */}
             <CheckoutProModal
                 isOpen={showCheckoutModal}

@@ -12,7 +12,8 @@ export default function BalancePage({ balance, onAddCredit }: BalancePageProps) 
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
     const handleCheckoutSuccess = () => {
-        // O hook useBalance vai atualizar o saldo automaticamente via realtime
+        // Recarrega a página para atualizar o saldo
+        window.location.reload();
         onAddCredit?.();
     };
 

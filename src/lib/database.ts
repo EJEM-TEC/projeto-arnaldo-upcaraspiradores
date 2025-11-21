@@ -96,22 +96,6 @@ export async function getUserProfile(userId: string) {
   return { data, error: null };
 }
 
-// Get user full name from profiles table
-export async function getUserFullName(userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('userid', userId)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error fetching user full name:', error);
-    return { data: null, error };
-  }
-
-  return { data, error: null };
-}
-
 // Update user profile
 export async function updateUserProfile(userId: string, updates: Partial<usuarios>) {
   const { data } = await supabase
@@ -245,10 +229,7 @@ export async function updateUserBalance(userId: string, saldo: number) {
 export interface Machine {
   id: number;
   location?: string;
-  address?: string;
   status?: string;
-  slug_id?: string;
-  command?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -300,35 +281,6 @@ export async function getMachineById(machineId: number) {
 
   if (error) {
     console.error('Error fetching machine:', error);
-    return { data: null, error };
-  }
-
-  return { data, error: null };
-}
-
-// Get machine by slug_id or ID
-export async function getMachineBySlugOrId(slugOrId: string) {
-  // Primeiro tenta como número (ID)
-  const numSlug = parseInt(slugOrId, 10);
-  if (!isNaN(numSlug)) {
-    const { data, error } = await supabase
-      .from('machines')
-      .select('*')
-      .eq('id', numSlug)
-      .maybeSingle();
-    
-    if (data) return { data, error: null };
-  }
-
-  // Se não encontrou por ID, tenta por slug_id
-  const { data, error } = await supabase
-    .from('machines')
-    .select('*')
-    .eq('slug_id', slugOrId.toLowerCase())
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error fetching machine by slug:', error);
     return { data: null, error };
   }
 
@@ -510,14 +462,12 @@ export async function createTransaction(transaction: {
   description: string;
   payment_method?: string;
 }) {
-  const normalizedAmount = Math.round(Number(transaction.amount) || 0);
-
   const { data, error } = await supabase
     .from('transactions')
     .insert([
       {
         user_id: transaction.user_id || null,
-        amount: normalizedAmount,
+        amount: transaction.amount,
         type: transaction.type,
         description: transaction.description,
         payment_method: transaction.payment_method || null,
@@ -805,45 +755,7 @@ export async function getMonthlyBilling(year: number, month: number) {
   return getBillingData(startDate, endDate);
 }
 
-// Machine command control functions
-// Set machine command to 'on' or 'off'
-export async function setMachineCommand(machineId: number, command: 'on' | 'off') {
-  const { data, error } = await supabase
-    .from('machines')
-    .update({ 
-      command: command,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', machineId)
-    .select()
-    .single();
-
-  if (error) {
-    console.error(`Error setting machine ${machineId} command to ${command}:`, error);
-    return { data: null, error };
-  }
-
-  console.log(`Machine ${machineId} command set to ${command}`);
-  return { data, error: null };
-}
-
-// Get machine command status
-export async function getMachineCommand(machineId: number) {
-  const { data, error } = await supabase
-    .from('machines')
-    .select('command')
-    .eq('id', machineId)
-    .maybeSingle();
-
-  if (error) {
-    console.error(`Error getting machine ${machineId} command:`, error);
-    return { data: null, error };
-  }
-
-  return { data: data?.command || 'off', error: null };
-}
-
-// Decrement user balance (subtract amount from balance)
+// Decrement user balance (subtract amount from existing balance)
 export async function decrementUserBalance(userId: string, amount: number) {
   // Primeiro, busca o saldo atual
   const { data: currentBalance, error: fetchError } = await getUserBalance(userId);
@@ -853,22 +765,19 @@ export async function decrementUserBalance(userId: string, amount: number) {
     return { data: null, error: fetchError };
   }
 
-  // Garante que temos um valor numérico válido
-  const currentSaldo = Math.round(parseFloat(String(currentBalance?.saldo || 0)));
-  const amountRounded = Math.round(parseFloat(String(amount)));
-  
-  console.log(`[BALANCE DEBUG] User: ${userId}, Current: ${currentSaldo}, Amount: ${amountRounded}`);
+  const currentSaldo = Math.round(currentBalance?.saldo || 0);
+  const amountRounded = Math.round(amount);
+  const newSaldo = Math.round(currentSaldo - amountRounded);
 
-  // Se saldo é insuficiente, retorna erro
-  if (currentSaldo < amountRounded) {
-    const error = new Error(`Saldo insuficiente: disponível R$ ${currentSaldo}, necessário R$ ${amountRounded}`);
-    console.error(`[BALANCE ERROR] Insufficient balance for user ${userId}: current=${currentSaldo}, required=${amountRounded}`);
-    return { data: null, error };
+  // Não permite saldo negativo
+  if (newSaldo < 0) {
+    return { 
+      data: null, 
+      error: { message: 'Saldo insuficiente', code: 'INSUFFICIENT_BALANCE' } as any 
+    };
   }
 
-  const newSaldo = Math.max(0, Math.round(currentSaldo - amountRounded)); // Não permite saldo negativo
-
-  // Atualiza o saldo na tabela profiles
+  // Atualiza o registro na tabela profiles
   const { data, error } = await supabase
     .from('profiles')
     .update({
@@ -888,245 +797,47 @@ export async function decrementUserBalance(userId: string, amount: number) {
   return { data, error: null };
 }
 
-// Get user activation history (máquinas que o usuário já usou)
-export async function getUserActivationHistory(userId: string, limit: number = 50) {
-  try {
-    const { data, error } = await supabase
-      .from('activation_history')
-      .select(`
-        id,
-        machine_id,
-        started_at,
-        ended_at,
-        duration_minutes,
-        cost,
-        status,
-        machines (
-          id,
-          location
-        )
-      `)
-      .eq('user_id', userId)
-      .order('started_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      console.error('Error fetching user activation history:', error);
-      // Se a coluna user_id não existe, retorna dados vazios (será criada na migração)
-      if (error.message?.includes('column') || error.message?.includes('does not exist')) {
-        return { data: [], error: null };
-      }
-      return { data: null, error };
-    }
-
-    return { data: data || [], error: null };
-  } catch (err) {
-    console.error('Unexpected error fetching user activation history:', err);
-    return { data: null, error: err as Error };
-  }
-}
-
-// Atualiza activation_history com user_id e cost quando a máquina é ativada
-export async function updateActivationHistoryWithUser(
-  activationId: number,
-  userId: string,
-  cost: number
-) {
-  try {
-    const { data, error } = await supabase
-      .from('activation_history')
-      .update({
-        user_id: userId,
-        cost: Math.round(cost),
-      })
-      .eq('id', activationId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating activation history with user:', error);
-      return { data: null, error };
-    }
-
-    return { data, error: null };
-  } catch (err) {
-    console.error('Unexpected error updating activation history:', err);
-    return { data: null, error: err as Error };
-  }
-}
-
-// ============================================
-// SLUG FUNCTIONS
-// ============================================
-
-/**
- * Gera um slug único a partir da localização e ID da máquina
- * Exemplo: "salao-principal-1"
- */
-/**
- * Gera um slug numérico aleatório de 6 dígitos
- * NOTA: No banco de dados, a geração é automática via trigger
- * Esta função é apenas para referência/teste
- */
-export function generateRandomSlug(): string {
-  const min = 100000;
-  const max = 999999;
-  const randomNum = Math.floor(Math.random() * (max - min + 1)) + min;
-  return randomNum.toString();
-}
-
-/**
- * Busca uma máquina pelo slug_id (6 dígitos) - função legada, use getMachineBySlugOrId
- */
-export async function getMachineBySlug(slugId: string) {
-  return getMachineBySlugOrId(slugId);
-}
-
-/**
- * Verifica se um slug já existe
- */
-export async function isSlugExists(slugId: string): Promise<boolean> {
-  try {
-    const { data, error } = await supabase
-      .from('machines')
-      .select('id', { count: 'exact' })
-      .eq('slug_id', slugId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116 = no rows returned (é ok)
-      console.error('Error checking if slug exists:', error);
-      return false;
-    }
-
-    return !!data;
-  } catch (err) {
-    console.error('Unexpected error checking slug existence:', err);
-    return false;
-  }
-}
-
-// ============================================
-// EXCEL IMPORTS FUNCTIONS
-// ============================================
-
-export interface ExcelImport {
-  id: number;
-  receita_posto: number;
-  receita_app: number;
-  receita_pix: number;
-  receita_cartao: number;
-  total_receita: number;
-  imported_at: string;
-  created_at: string;
-}
-
-export interface ExcelImportRow {
-  id: number;
-  import_id: number;
-  equipamento: string;
-  tempo_em_min: number;
-  valor_por_aspira: number;
-  quantidade: number;
-  saldo_utilizado: number;
-  valor_total: number;
-  created_at: string;
-}
-
-// Get all Excel imports with their rows
-export async function getExcelImports(limit: number = 50) {
+// Set machine command (on/off)
+export async function setMachineCommand(machineId: number, command: 'on' | 'off') {
   const { data, error } = await supabase
-    .from('excel_imports')
-    .select(`
-      id,
-      receita_posto,
-      receita_app,
-      receita_pix,
-      receita_cartao,
-      total_receita,
-      imported_at,
-      created_at,
-      excel_import_rows (
-        id,
-        import_id,
-        equipamento,
-        tempo_em_min,
-        valor_por_aspira,
-        quantidade,
-        saldo_utilizado,
-        valor_total,
-        created_at
-      )
-    `)
-    .order('imported_at', { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    console.error('Error fetching Excel imports:', error);
-    return { data: null, error };
-  }
-
-  return { data, error: null };
-}
-
-// Get a specific Excel import with its rows
-export async function getExcelImportById(importId: number) {
-  const { data, error } = await supabase
-    .from('excel_imports')
-    .select(`
-      id,
-      receita_posto,
-      receita_app,
-      receita_pix,
-      receita_cartao,
-      total_receita,
-      imported_at,
-      created_at,
-      excel_import_rows (
-        id,
-        import_id,
-        equipamento,
-        tempo_em_min,
-        valor_por_aspira,
-        quantidade,
-        saldo_utilizado,
-        valor_total,
-        created_at
-      )
-    `)
-    .eq('id', importId)
+    .from('machines')
+    .update({
+      command: command,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', machineId)
+    .select()
     .single();
 
   if (error) {
-    console.error('Error fetching Excel import:', error);
+    console.error('Error setting machine command:', error);
+    return { data: null, error };
+  }
+
+  console.log(`Machine ${machineId} command set to: ${command}`);
+  return { data, error: null };
+}
+
+// Update activation history with user info
+export async function updateActivationHistoryWithUser(
+  historyId: number, 
+  userId: string, 
+  cost: number
+) {
+  const { data, error } = await supabase
+    .from('activation_history')
+    .update({
+      user_id: userId,
+      cost: cost,
+    })
+    .eq('id', historyId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating activation history with user:', error);
     return { data: null, error };
   }
 
   return { data, error: null };
-}
-
-// Get summary statistics from Excel imports
-export async function getExcelImportSummary() {
-  const { data, error } = await supabase
-    .from('excel_imports')
-    .select('total_receita, imported_at, created_at');
-
-  if (error) {
-    console.error('Error fetching import summary:', error);
-    return { data: null, error };
-  }
-
-  // Calcular totais
-  const totalReceita = (data || []).reduce((sum, item) => sum + (item.total_receita || 0), 0);
-  const importCount = data?.length || 0;
-  const lastImportDate = data?.[0]?.imported_at || null;
-
-  return {
-    data: {
-      totalReceita,
-      importCount,
-      lastImportDate,
-    },
-    error: null,
-  };
 }
