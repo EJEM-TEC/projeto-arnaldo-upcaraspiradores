@@ -123,8 +123,8 @@ export default function HomePage() {
         <div className="mt-12 text-center text-gray-500 text-sm">
           <p>
             Problema ao acessar? Entre em contato com{' '}
-            <a href="mailto:suporte@upcaraspiradores.com" className="text-orange-500 hover:text-orange-400">
-              suporte@upcaraspiradores.com
+            <a href="mailto:arnaldfirst@gmail.com" className="text-orange-500 hover:text-orange-400">
+              arnaldfirst@gmail.com
             </a>
           </p>
         </div>
