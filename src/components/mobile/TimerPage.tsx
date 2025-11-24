@@ -14,11 +14,11 @@ export default function TimerPage({ amount, onStart, machineSlug }: TimerPagePro
 
     const timeOptions = [
         { label: '5 min', value: '5', price: 5 },
+        { label: '6 min', value: '6', price: 6 },
+        { label: '7 min', value: '7', price: 7 },
+        { label: '8 min', value: '8', price: 8 },
+        { label: '9 min', value: '9', price: 9 },
         { label: '10 min', value: '10', price: 10 },
-        { label: '15 min', value: '15', price: 15 },
-        { label: '20 min', value: '20', price: 20 },
-        { label: '30 min', value: '30', price: 30 },
-        { label: '45 min', value: '45', price: 45 },
     ];
 
     const handleTimeSelect = (time: string) => {
