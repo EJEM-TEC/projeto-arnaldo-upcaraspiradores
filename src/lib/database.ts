@@ -875,3 +875,28 @@ export async function updateMonthlySubscriptionPrice(price: number): Promise<Sup
     return { data: null, error: err as Error };
   }
 }
+
+export async function setMachineCommand(machineId: number, command: 'on' | 'off') {
+  try {
+    const { data, error } = await supabaseServer
+      .from('machines')
+      .update({
+        command,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', machineId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error setting machine command:', error);
+      return { data: null, error };
+    }
+
+    console.log(`Machine ${machineId} command set to ${command}`);
+    return { data, error: null };
+  } catch (err) {
+    console.error('Unexpected error setting machine command:', err);
+    return { data: null, error: err as Error };
+  }
+}
