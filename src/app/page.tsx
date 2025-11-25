@@ -32,40 +32,7 @@ export default function HomePage() {
 
         {/* Main Content */}
         <div className="bg-gray-900 border border-gray-800 rounded-lg p-8">
-          <h2 className="text-2xl font-bold mb-6">Como Usar?</h2>
-
-          {/* Instructions */}
-          <div className="space-y-6 mb-8">
-            <div className="flex gap-4">
-              <div className="text-orange-500 text-2xl font-bold">1</div>
-              <div>
-                <h3 className="font-bold mb-2">Escaneie o QR Code</h3>
-                <p className="text-gray-400">
-                  Use seu smartphone para escanear o QR code disponível na máquina. Você será direcionado automaticamente.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="text-orange-500 text-2xl font-bold">2</div>
-              <div>
-                <h3 className="font-bold mb-2">Ou Digite o Código da Máquina</h3>
-                <p className="text-gray-400">
-                  Se preferir, digite o código de 6 dígitos da máquina abaixo para acessar.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="text-orange-500 text-2xl font-bold">3</div>
-              <div>
-                <h3 className="font-bold mb-2">Controle a Máquina</h3>
-                <p className="text-gray-400">
-                  Uma vez dentro, você pode ativar a máquina, ver histórico de uso e comprar créditos.
-                </p>
-              </div>
-            </div>
-          </div>
+          <h2 className="text-2xl font-bold mb-6">Insira o número da máquina abaixo</h2>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -93,28 +60,6 @@ export default function HomePage() {
             </button>
           </form>
 
-          {/* Examples */}
-          <div className="mt-8 pt-8 border-t border-gray-800">
-            <p className="text-sm text-gray-500 mb-4">Exemplos de códigos válidos:</p>
-            <div className="space-y-2">
-              <button
-                onClick={() => window.location.href = '/home/123456'}
-                className="block w-full px-3 py-2 bg-gray-800 rounded hover:bg-gray-700 transition text-sm text-orange-500 hover:text-orange-400 text-left"
-              >
-                /home/123456
-              </button>
-              <button
-                onClick={() => window.location.href = '/home/654321'}
-                className="block w-full px-3 py-2 bg-gray-800 rounded hover:bg-gray-700 transition text-sm text-orange-500 hover:text-orange-400 text-left"
-              >
-                /home/654321
-              </button>
-              <button
-                onClick={() => window.location.href = '/home/999999'}
-                className="block w-full px-3 py-2 bg-gray-800 rounded hover:bg-gray-700 transition text-sm text-orange-500 hover:text-orange-400 text-left"
-              >
-                /home/999999
-              </button>
             </div>
           </div>
         </div>
