@@ -841,3 +841,45 @@ export async function updateActivationHistoryWithUser(
 
   return { data, error: null };
 }
+
+// App Settings functions (Monthly Subscription Price)
+export async function getMonthlySubscriptionPrice() {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'monthly_subscription_price')
+    .maybeSingle();
+
+  if (error) {
+    // If table doesn't exist yet, return default
+    if (error.code === '42P01' || error.message?.includes('does not exist')) {
+       return { data: { price: 5 }, error: null };
+    }
+    console.error('Error fetching monthly subscription price:', error);
+    return { data: null, error };
+  }
+
+  const price = data ? parseFloat(data.value) : 5; // Default 5 if not set
+  return { data: { price }, error: null };
+}
+
+export async function updateMonthlySubscriptionPrice(price: number) {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .upsert({
+      key: 'monthly_subscription_price',
+      value: price.toString(),
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'key'
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating monthly subscription price:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
