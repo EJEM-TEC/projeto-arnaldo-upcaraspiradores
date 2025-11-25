@@ -1,17 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 
 interface PixCodePageProps {
     amount: string;
     cpf: string;
     pixCode?: string;
-    qrCode?: string;
     onCopyCode: () => void;
 }
 
-export default function PixCodePage({ amount, pixCode, qrCode, onCopyCode }: PixCodePageProps) {
+export default function PixCodePage({ amount, pixCode, onCopyCode }: PixCodePageProps) {
     const [copied, setCopied] = useState(false);
 
     const handleCopy = async () => {
@@ -39,17 +37,6 @@ export default function PixCodePage({ amount, pixCode, qrCode, onCopyCode }: Pix
             {/* PIX Logo Box */}
             <div className="bg-white rounded-lg p-8 mb-8">
                 <div className="flex flex-col items-center space-y-4">
-                    {/* QR Code */}
-                    {qrCode && (
-                        <Image 
-                            src={`data:image/png;base64,${qrCode}`} 
-                            alt="QR Code PIX" 
-                            width={192}
-                            height={192}
-                            className="border-2 border-gray-300 rounded-lg"
-                        />
-                    )}
-                    
                     {/* PIX Logo */}
                     <div className="flex items-center space-x-3">
                         <div className="w-12 h-12 bg-teal-500 rounded-lg flex items-center justify-center">
@@ -63,6 +50,17 @@ export default function PixCodePage({ amount, pixCode, qrCode, onCopyCode }: Pix
                         </div>
                     </div>
 
+                    <p className="text-gray-600 text-center mt-4">
+                        Valor: <span className="font-bold text-lg">R$ {amount}</span>
+                    </p>
+
+                    {/* Instruction Text */}
+                    {pixCode && (
+                        <p className="text-gray-700 text-center text-sm mt-2 mb-4">
+                            Copie o código, pague no seu banco e retorne ao aplicativo
+                        </p>
+                    )}
+
                     {/* PIX Code */}
                     {pixCode && (
                         <div className="w-full mt-4 p-4 bg-gray-100 rounded-lg">
@@ -70,10 +68,6 @@ export default function PixCodePage({ amount, pixCode, qrCode, onCopyCode }: Pix
                             <p className="text-sm font-mono break-all text-gray-800">{pixCode}</p>
                         </div>
                     )}
-
-                    <p className="text-gray-600 text-center mt-4">
-                        Valor: <span className="font-bold text-lg">R$ {amount}</span>
-                    </p>
                 </div>
             </div>
 

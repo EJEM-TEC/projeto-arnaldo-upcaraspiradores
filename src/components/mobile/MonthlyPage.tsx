@@ -8,12 +8,12 @@ interface MonthlyPageProps {
 }
 
 export default function MonthlyPage({ onNext }: MonthlyPageProps) {
-    const [selectedAmount, setSelectedAmount] = useState('5');
+    const [monthlyPrice, setMonthlyPrice] = useState<string>('5');
+    const [loadingPrice, setLoadingPrice] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [cpf, setCpf] = useState('');
     const { user } = useAuth();
-    const amounts = ['5', '10', '20', '30', '40', '50'];
     const popupIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const popupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const popupRef = useRef<Window | null>(null);
@@ -27,6 +27,29 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
         return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6, 9)}-${cleaned.slice(9, 11)}`;
     };
 
+    // Carregar preço mensalista ao montar o componente
+    useEffect(() => {
+        const fetchMonthlyPrice = async () => {
+            setLoadingPrice(true);
+            try {
+                const response = await fetch('/api/admin/monthly-price');
+                if (response.ok) {
+                    const data = await response.json();
+                    setMonthlyPrice(data.price?.toString() || '5');
+                } else {
+                    console.error('Erro ao buscar preço mensalista');
+                    setMonthlyPrice('5');
+                }
+            } catch (error) {
+                console.error('Erro ao buscar preço mensalista:', error);
+                setMonthlyPrice('5');
+            } finally {
+                setLoadingPrice(false);
+            }
+        };
+        fetchMonthlyPrice();
+    }, []);
+
     const today = new Date();
     const day = today.getDate();
 
@@ -35,8 +58,8 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
         setError('');
 
         // Validações
-        if (!selectedAmount || parseFloat(selectedAmount) <= 0) {
-            setError('Por favor, selecione um valor para adicionar');
+        if (!monthlyPrice || parseFloat(monthlyPrice) <= 0) {
+            setError('Preço mensalista não configurado');
             return;
         }
 
@@ -60,13 +83,13 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    amount: selectedAmount,
+                    amount: monthlyPrice,
                     userId: user?.id,
                     payer: {
                         email: user.email,
                         cpf: cpf.replace(/\D/g, ''),
                     },
-                    description: `Assinatura mensal - R$ ${selectedAmount} (Dia ${day})`,
+                    description: `Assinatura mensal - R$ ${monthlyPrice} (Dia ${day})`,
                     isSubscription: true, // Flag para indicar que é assinatura
                 }),
             });
@@ -123,7 +146,7 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
                     setTimeout(() => {
                         // O webhook processará o pagamento e atualizará o banco de dados
                         onNext({
-                            amount: selectedAmount,
+                            amount: monthlyPrice,
                         });
                     }, 2000);
                 }
@@ -142,7 +165,7 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
 
                         if (event.data.status === 'approved' || event.data.status === 'success') {
                             onNext({
-                                amount: selectedAmount,
+                                amount: monthlyPrice,
                             });
                         } else {
                             setError('Pagamento não aprovado. Tente novamente.');
@@ -200,36 +223,27 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
             {/* Separator */}
             <div className="w-full h-px bg-orange-500 mb-8"></div>
 
-            {/* Amount Selection */}
+            {/* Texto de instrução */}
             <div className="mb-8">
-                <p className="text-white text-lg mb-6 text-center">
-                    Selecione abaixo o quanto gostaria de adicionar:
+                <p className="text-white text-lg mb-6 text-center font-semibold">
+                    Assine o mensalista da UpCar e ganhe saldo mensalmente!
                 </p>
+            </div>
 
-                <div className="flex flex-wrap justify-center gap-4 mb-4">
-                    {amounts.map((amount) => (
-                        <button
-                            key={amount}
-                            type="button"
-                            onClick={() => {
-                                setSelectedAmount(amount);
-                                setError(''); // Limpa erro ao mudar valor
-                            }}
-                            disabled={loading}
-                            className={`w-20 h-20 rounded-full font-bold text-lg transition-colors flex items-center justify-center ${selectedAmount === amount
-                                ? 'bg-orange-500 text-white'
-                                : 'bg-white text-black hover:bg-gray-200'
-                                } disabled:opacity-50`}
-                        >
-                            R$ {amount}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Mostra o valor selecionado */}
-                <p className="text-white text-sm text-center mt-2">
-                    Valor selecionado: <span className="font-bold text-orange-500">R$ {selectedAmount}</span>
-                </p>
+            {/* Valor da assinatura */}
+            <div className="mb-8">
+                {loadingPrice ? (
+                    <div className="text-center">
+                        <p className="text-white text-sm">Carregando preço...</p>
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-lg p-6 mb-6">
+                        <p className="text-gray-600 text-center text-sm mb-2">Valor da Assinatura Mensal</p>
+                        <p className="text-gray-900 text-center text-3xl font-bold">
+                            R$ {parseFloat(monthlyPrice).toFixed(2).replace('.', ',')}
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Separator */}
@@ -273,17 +287,17 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
                 </div>
             )}
 
-            {/* Botão de Pagar */}
+            {/* Botão de Assinar */}
             <button
                 type="button"
                 onClick={handleCheckoutPro}
-                disabled={loading}
-                className={`w-full h-14 rounded-full font-bold text-lg transition-colors mt-6 ${loading
+                disabled={loading || loadingPrice}
+                className={`w-full h-14 rounded-full font-bold text-lg transition-colors mt-6 ${loading || loadingPrice
                     ? 'bg-gray-500 text-white cursor-not-allowed'
                     : 'bg-orange-500 text-white hover:bg-orange-600'
                     } disabled:opacity-50`}
             >
-                {loading ? 'Abrindo checkout...' : `PAGAR R$ ${selectedAmount} MENSALMENTE`}
+                {loading ? 'Abrindo checkout...' : loadingPrice ? 'Carregando...' : 'ASSINAR'}
             </button>
 
             {/* Secure Purchase Badge */}

@@ -33,7 +33,7 @@ type MachineStats = {
   created_at: string | null;
 };
 
-type DashboardView = 'adicionar_credito' | 'faturamento' | 'historico_acionamentos' | 'equipamentos' | 'alterar_senha' | 'adicionar_maquina' | 'historico_caixa' | 'importar_excel';
+type DashboardView = 'adicionar_credito' | 'faturamento' | 'historico_acionamentos' | 'equipamentos' | 'alterar_senha' | 'adicionar_maquina' | 'historico_caixa' | 'importar_excel' | 'configurar_mensalista';
 
 const MINUTE_RATE = 0.5;
 
@@ -167,10 +167,13 @@ export default function Dashboard() {
   const [_cashHistoryEnd, _setCashHistoryEnd] = useState<string>('');
   const [exportingHistory, setExportingHistory] = useState(false);
   const [revenueSummary, setRevenueSummary] = useState<RevenueSummary>(INITIAL_REVENUE_SUMMARY);
+  const [monthlyPrice, setMonthlyPrice] = useState<string>('5');
+  const [loadingMonthlyPrice, setLoadingMonthlyPrice] = useState(false);
+  const [savingMonthlyPrice, setSavingMonthlyPrice] = useState(false);
 
   useEffect(() => {
     const view = searchParams.get('view');
-    if (view && ['faturamento', 'historico_acionamentos', 'equipamentos', 'alterar_senha', 'adicionar_maquina', 'historico_caixa', 'importar_excel'].includes(view)) {
+    if (view && ['faturamento', 'historico_acionamentos', 'equipamentos', 'alterar_senha', 'adicionar_maquina', 'historico_caixa', 'importar_excel', 'configurar_mensalista'].includes(view)) {
       setCurrentView(view as DashboardView);
     } else {
       setCurrentView('adicionar_credito');
@@ -341,6 +344,31 @@ export default function Dashboard() {
     };
     loadStats();
   }, [currentView, machines]);
+
+  // Carregar preço mensalista quando a view for configurar_mensalista
+  useEffect(() => {
+    const fetchMonthlyPrice = async () => {
+      if (currentView === 'configurar_mensalista') {
+        setLoadingMonthlyPrice(true);
+        try {
+          const response = await fetch('/api/admin/monthly-price');
+          if (response.ok) {
+            const data = await response.json();
+            setMonthlyPrice(data.price?.toString() || '5');
+          } else {
+            console.error('Erro ao buscar preço mensalista');
+            setMonthlyPrice('5');
+          }
+        } catch (error) {
+          console.error('Erro ao buscar preço mensalista:', error);
+          setMonthlyPrice('5');
+        } finally {
+          setLoadingMonthlyPrice(false);
+        }
+      }
+    };
+    fetchMonthlyPrice();
+  }, [currentView]);
 
   const fetchClientName = async (id: string) => {
     if (!id.trim()) {
@@ -775,7 +803,7 @@ export default function Dashboard() {
 
     try {
       const XLSX = await import('xlsx');
-      
+
       // Preparar os dados
       const data = activationHistory.map((item) => {
         const activationWithMachine = item as ActivationHistoryWithMachine;
@@ -801,7 +829,7 @@ export default function Dashboard() {
       // Criar workbook e adicionar worksheet
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(data);
-      
+
       // Ajustar largura das colunas
       const columnWidths = [
         { wch: 10 },  // ID
@@ -816,7 +844,7 @@ export default function Dashboard() {
       worksheet['!cols'] = columnWidths;
 
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Histórico');
-      
+
       // Fazer download
       const dateStr = new Date().toISOString().split('T')[0];
       XLSX.writeFile(workbook, `historico_acionamentos_${dateStr}.xlsx`);
@@ -1731,6 +1759,78 @@ export default function Dashboard() {
                 <h3 className="text-xl font-semibold text-gray-800 mb-4">2️⃣ Importar Planilha Preenchida</h3>
                 <ExcelUploader />
               </div>
+            </div>
+          </>
+        );
+
+      case 'configurar_mensalista':
+        const handleSaveMonthlyPrice = async (e: React.FormEvent) => {
+          e.preventDefault();
+
+          const priceValue = parseFloat(monthlyPrice);
+          if (isNaN(priceValue) || priceValue <= 0) {
+            alert('Por favor, informe um preço válido maior que zero.');
+            return;
+          }
+
+          setSavingMonthlyPrice(true);
+          try {
+            const response = await fetch('/api/admin/monthly-price', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ price: priceValue }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              alert(`Erro ao salvar preço: ${data.error || 'Erro desconhecido'}`);
+              return;
+            }
+
+            alert(`Preço mensalista atualizado para R$ ${priceValue.toFixed(2)} com sucesso!`);
+          } catch (error) {
+            console.error('Erro ao salvar preço mensalista:', error);
+            alert('Erro ao salvar preço mensalista. Tente novamente.');
+          } finally {
+            setSavingMonthlyPrice(false);
+          }
+        };
+
+        return (
+          <>
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">Configurar Preço Mensalista</h2>
+            <div className="bg-gray-50 p-6 rounded-lg max-w-md">
+              <form className="space-y-4" onSubmit={handleSaveMonthlyPrice}>
+                <div>
+                  <label htmlFor="monthly-price" className="block text-sm font-medium text-gray-700 mb-2">
+                    Preço da Assinatura Mensal (R$)
+                  </label>
+                  <input
+                    type="number"
+                    id="monthly-price"
+                    min="0.01"
+                    step="0.01"
+                    value={loadingMonthlyPrice ? 'Carregando...' : monthlyPrice}
+                    onChange={(e) => setMonthlyPrice(e.target.value)}
+                    disabled={loadingMonthlyPrice || savingMonthlyPrice}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 disabled:bg-gray-100"
+                    placeholder="Digite o preço"
+                    required
+                  />
+                  <p className="text-sm text-gray-500 mt-2">
+                    Este será o preço fixo que os usuários verão na página de assinatura mensal.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loadingMonthlyPrice || savingMonthlyPrice}
+                  className="w-full bg-orange-500 text-white py-3 rounded-lg font-medium hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingMonthlyPrice ? 'Salvando...' : 'Salvar Preço'}
+                </button>
+              </form>
             </div>
           </>
         );

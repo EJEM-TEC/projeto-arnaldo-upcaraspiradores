@@ -13,12 +13,18 @@ export default function TimerPage({ amount, onStart, machineSlug }: TimerPagePro
     const [isLoading, setIsLoading] = useState(false);
 
     const timeOptions = [
+        { label: '1 min', value: '1', price: 1 },
+        { label: '2 min', value: '2', price: 2 },
+        { label: '3 min', value: '3', price: 3 },
+        { label: '4 min', value: '4', price: 4 },
         { label: '5 min', value: '5', price: 5 },
         { label: '6 min', value: '6', price: 6 },
         { label: '7 min', value: '7', price: 7 },
         { label: '8 min', value: '8', price: 8 },
         { label: '9 min', value: '9', price: 9 },
         { label: '10 min', value: '10', price: 10 },
+        { label: '11 min', value: '11', price: 11 },
+        { label: '12 min', value: '12', price: 12 },
     ];
 
     const handleTimeSelect = (time: string) => {
@@ -39,6 +45,9 @@ export default function TimerPage({ amount, onStart, machineSlug }: TimerPagePro
     const balanceNumber = parseFloat(amount.replace(',', '.'));
     const hasEnoughBalance = balanceNumber >= selectedPrice;
 
+    // Verifica se o saldo é suficiente para cada opção
+    const canAffordOption = (optionPrice: number) => balanceNumber >= optionPrice;
+
     return (
         <div className="px-4 py-6">
             {/* Page Title */}
@@ -48,6 +57,13 @@ export default function TimerPage({ amount, onStart, machineSlug }: TimerPagePro
 
             {/* Separator */}
             <div className="w-full h-px bg-orange-500 mb-8"></div>
+
+            {/* Saldo Insuficiente Alert */}
+            {selectedTime && !hasEnoughBalance && (
+                <div className="bg-red-600 border-2 border-red-500 text-white text-center py-4 rounded-lg font-bold text-lg uppercase mb-6 animate-pulse">
+                    SALDO INSUFICIENTE
+                </div>
+            )}
 
             {/* Time Selection */}
             <div className="mb-8">
@@ -64,19 +80,25 @@ export default function TimerPage({ amount, onStart, machineSlug }: TimerPagePro
 
                 {/* Time Options */}
                 <div className="grid grid-cols-2 gap-4 mb-8">
-                    {timeOptions.map((option) => (
-                        <button
-                            key={option.value}
-                            onClick={() => handleTimeSelect(option.value)}
-                            disabled={isLoading}
-                            className={`py-3 rounded-lg font-bold text-lg transition-colors ${selectedTime === option.value
-                                ? 'bg-orange-500 text-white'
-                                : 'bg-gray-800 text-white hover:bg-gray-700'
-                                } disabled:opacity-50`}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
+                    {timeOptions.map((option) => {
+                        const canAfford = canAffordOption(option.price);
+                        const isSelected = selectedTime === option.value;
+                        return (
+                            <button
+                                key={option.value}
+                                onClick={() => handleTimeSelect(option.value)}
+                                disabled={isLoading || !canAfford}
+                                className={`py-3 rounded-lg font-bold text-lg transition-colors ${isSelected && canAfford
+                                    ? 'bg-orange-500 text-white'
+                                    : !canAfford
+                                        ? 'bg-gray-900 text-gray-500 cursor-not-allowed'
+                                        : 'bg-gray-800 text-white hover:bg-gray-700'
+                                    } disabled:opacity-50`}
+                            >
+                                {option.label}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
