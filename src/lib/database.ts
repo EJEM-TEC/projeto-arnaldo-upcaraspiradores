@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { supabaseServer } from './supabaseServer';
 
 interface SupabaseErrorWithHint {
   code?: string;
@@ -222,6 +223,53 @@ export async function updateUserBalance(userId: string, saldo: number) {
     return { data: null, error };
   }
 
+  return { data, error: null };
+}
+
+// Decrement user balance (deduct amount from existing balance)
+// Uses service_role to bypass RLS restrictions
+export async function decrementUserBalance(userId: string, amount: number) {
+  // Fetch current balance
+  const { data: currentBalance, error: fetchError } = await getUserBalance(userId);
+  
+  if (fetchError) {
+    console.error('Error fetching current balance:', fetchError);
+    return { data: null, error: fetchError };
+  }
+
+  const currentSaldo = Math.round(currentBalance?.saldo || 0);
+  const amountRounded = Math.round(amount);
+  const newSaldo = currentSaldo - amountRounded;
+
+  // Check if there's enough balance
+  if (newSaldo < 0) {
+    console.error(`Insufficient balance: ${currentSaldo} < ${amountRounded}`);
+    return { 
+      data: null, 
+      error: { 
+        code: 'INSUFFICIENT_BALANCE',
+        message: 'Saldo insuficiente para esta operação'
+      }
+    };
+  }
+
+  // Use service_role to bypass RLS
+  const { data, error } = await supabaseServer
+    .from('profiles')
+    .update({
+      saldo: newSaldo,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error decrementing user balance:', error);
+    return { data: null, error };
+  }
+
+  console.log(`[DECREMENT] Balance for user ${userId}: ${currentSaldo} - ${amount} = ${newSaldo}`);
   return { data, error: null };
 }
 
@@ -753,133 +801,4 @@ export async function getMonthlyBilling(year: number, month: number) {
   const startDate = new Date(year, month - 1, 1).toISOString();
   const endDate = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
   return getBillingData(startDate, endDate);
-}
-
-// Decrement user balance (subtract amount from existing balance)
-export async function decrementUserBalance(userId: string, amount: number) {
-  // Primeiro, busca o saldo atual
-  const { data: currentBalance, error: fetchError } = await getUserBalance(userId);
-  
-  if (fetchError) {
-    console.error('Error fetching current balance:', fetchError);
-    return { data: null, error: fetchError };
-  }
-
-  const currentSaldo = Math.round(currentBalance?.saldo || 0);
-  const amountRounded = Math.round(amount);
-  const newSaldo = Math.round(currentSaldo - amountRounded);
-
-  // Não permite saldo negativo
-  if (newSaldo < 0) {
-    return { 
-      data: null, 
-      error: { message: 'Saldo insuficiente', code: 'INSUFFICIENT_BALANCE' } as SupabaseErrorWithHint 
-    };
-  }
-
-  // Atualiza o registro na tabela profiles
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({
-      saldo: newSaldo,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', userId)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error decrementing user balance:', error);
-    return { data: null, error };
-  }
-
-  console.log(`Balance decremented for user ${userId}: ${currentSaldo} - ${amount} = ${newSaldo}`);
-  return { data, error: null };
-}
-
-// Set machine command (on/off)
-export async function setMachineCommand(machineId: number, command: 'on' | 'off') {
-  const { data, error } = await supabase
-    .from('machines')
-    .update({
-      command: command,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', machineId)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error setting machine command:', error);
-    return { data: null, error };
-  }
-
-  console.log(`Machine ${machineId} command set to: ${command}`);
-  return { data, error: null };
-}
-
-// Update activation history with user info
-export async function updateActivationHistoryWithUser(
-  historyId: number, 
-  userId: string, 
-  cost: number
-) {
-  const { data, error } = await supabase
-    .from('activation_history')
-    .update({
-      user_id: userId,
-      cost: cost,
-    })
-    .eq('id', historyId)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error updating activation history with user:', error);
-    return { data: null, error };
-  }
-
-  return { data, error: null };
-}
-
-// App Settings functions (Monthly Subscription Price)
-export async function getMonthlySubscriptionPrice() {
-  const { data, error } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'monthly_subscription_price')
-    .maybeSingle();
-
-  if (error) {
-    // If table doesn't exist yet, return default
-    if (error.code === '42P01' || error.message?.includes('does not exist')) {
-       return { data: { price: 5 }, error: null };
-    }
-    console.error('Error fetching monthly subscription price:', error);
-    return { data: null, error };
-  }
-
-  const price = data ? parseFloat(data.value) : 5; // Default 5 if not set
-  return { data: { price }, error: null };
-}
-
-export async function updateMonthlySubscriptionPrice(price: number) {
-  const { data, error } = await supabase
-    .from('app_settings')
-    .upsert({
-      key: 'monthly_subscription_price',
-      value: price.toString(),
-      updated_at: new Date().toISOString(),
-    }, {
-      onConflict: 'key'
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error updating monthly subscription price:', error);
-    return { data: null, error };
-  }
-
-  return { data, error: null };
 }
