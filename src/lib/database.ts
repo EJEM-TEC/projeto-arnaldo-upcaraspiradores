@@ -773,7 +773,7 @@ export async function decrementUserBalance(userId: string, amount: number) {
   if (newSaldo < 0) {
     return { 
       data: null, 
-      error: { message: 'Saldo insuficiente', code: 'INSUFFICIENT_BALANCE' } 
+      error: { message: 'Saldo insuficiente', code: 'INSUFFICIENT_BALANCE' } as any 
     };
   }
 
@@ -840,66 +840,4 @@ export async function updateActivationHistoryWithUser(
   }
 
   return { data, error: null };
-}
-
-// Monthly subscription price configuration
-export interface MonthlySubscriptionPrice {
-  id: number;
-  price: number;
-  updated_at: string;
-}
-
-// Get monthly subscription price
-export async function getMonthlySubscriptionPrice() {
-  try {
-    // Tenta buscar da tabela app_settings primeiro
-    const { data, error } = await supabase
-      .from('app_settings')
-      .select('*')
-      .eq('key', 'monthly_subscription_price')
-      .maybeSingle();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching monthly subscription price:', error);
-    }
-
-    // Se encontrou, retorna o valor
-    if (data) {
-      return { data: { price: parseFloat(data.value || '5') }, error: null };
-    }
-
-    // Se não encontrou, retorna valor padrão
-    return { data: { price: 5 }, error: null };
-  } catch (err) {
-    console.error('Unexpected error fetching monthly subscription price:', err);
-    return { data: { price: 5 }, error: null };
-  }
-}
-
-// Update monthly subscription price
-export async function updateMonthlySubscriptionPrice(price: number) {
-  try {
-    // Usa upsert para criar ou atualizar
-    const { data, error } = await supabase
-      .from('app_settings')
-      .upsert({
-        key: 'monthly_subscription_price',
-        value: price.toString(),
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'key'
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating monthly subscription price:', error);
-      return { data: null, error };
-    }
-
-    return { data, error: null };
-  } catch (err) {
-    console.error('Unexpected error updating monthly subscription price:', err);
-    return { data: null, error: err as Error };
-  }
 }

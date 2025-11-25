@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     // Garante que o saldo é um número válido
     const rawSaldo = balanceData?.saldo;
-    const currentBalance = Number(rawSaldo) || 0;
+    const currentBalance = typeof rawSaldo === 'number' ? Math.round(rawSaldo) : 0;
     console.log(`[ACTIVATE] User ${userId} balance check: currentBalance=${currentBalance} vs required=${totalPrice}`);
     console.log(`[ACTIVATE] Has enough balance? ${currentBalance >= totalPrice}`);
 

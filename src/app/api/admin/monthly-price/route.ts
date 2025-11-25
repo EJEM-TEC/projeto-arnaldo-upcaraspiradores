@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { updateMonthlySubscriptionPrice, getMonthlySubscriptionPrice } from '@/lib/database';
+// 1. Importe o tipo de erro oficial do Supabase
+import { PostgrestError } from '@supabase/supabase-js';
 
 export async function GET() {
   try {
@@ -8,7 +10,8 @@ export async function GET() {
     
     if (error) {
       return NextResponse.json(
-        { error: 'Erro ao buscar preço mensalista', details: error.message },
+        // 2. Faça a asserção de tipo aqui
+        { error: 'Erro ao buscar preço mensalista', details: (error as PostgrestError).message },
         { status: 500 }
       );
     }
@@ -20,6 +23,7 @@ export async function GET() {
   } catch (error) {
     console.error('❌ Unexpected error in get monthly price route:', error);
     return NextResponse.json(
+      // 3. No catch genérico, converta para string ou use (error as Error).message
       { error: 'Erro ao processar solicitação', details: String(error) },
       { status: 500 }
     );
@@ -62,7 +66,8 @@ export async function POST(request: NextRequest) {
       if (insertError) {
         console.error('❌ Error creating/updating monthly price:', insertError);
         return NextResponse.json(
-          { error: 'Erro ao atualizar preço mensalista', details: insertError.message },
+          // 4. Faça a asserção de tipo aqui também
+          { error: 'Erro ao atualizar preço mensalista', details: (insertError as PostgrestError).message },
           { status: 500 }
         );
       }
@@ -84,7 +89,7 @@ export async function POST(request: NextRequest) {
         price: priceValue,
       },
       { status: 200 }
-    );
+      );
   } catch (error) {
     console.error('❌ Unexpected error in update monthly price route:', error);
     return NextResponse.json(
@@ -93,4 +98,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
