@@ -63,7 +63,7 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-
+  );
         {/* Info Footer */}
         <div className="mt-12 text-center text-gray-500 text-sm">
           <p>
@@ -73,7 +73,4 @@ export default function HomePage() {
             </a>
           </p>
         </div>
-      </div>
-    </div>
-  );
 }
