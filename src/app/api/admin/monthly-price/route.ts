@@ -45,13 +45,13 @@ export async function POST(request: NextRequest) {
     const priceValue = parseFloat(price);
 
     // Tenta atualizar usando a função do database
-    const { data, error } = await updateMonthlySubscriptionPrice(priceValue);
+    const { data: _updatedSetting, error } = await updateMonthlySubscriptionPrice(priceValue);
 
     if (error) {
       // Se a tabela não existe, tenta criar usando service role
       console.log('Tabela app_settings não existe, criando registro via service role...');
       
-      const { data: insertData, error: insertError } = await supabaseServer
+      const { data: _insertData, error: insertError } = await supabaseServer
         .from('app_settings')
         .upsert({
           key: 'monthly_subscription_price',

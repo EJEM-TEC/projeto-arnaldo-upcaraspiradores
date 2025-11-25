@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { supabaseServer } from './supabaseServer';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 interface SupabaseErrorWithHint {
   code?: string;
@@ -801,4 +802,76 @@ export async function getMonthlyBilling(year: number, month: number) {
   const startDate = new Date(year, month - 1, 1).toISOString();
   const endDate = new Date(year, month, 0, 23, 59, 59, 999).toISOString();
   return getBillingData(startDate, endDate);
+}
+
+const DEFAULT_MONTHLY_PRICE = 5;
+
+type MonthlyPriceResult = {
+  price: number;
+};
+
+type SupabaseResult<T> = {
+  data: T | null;
+  error: PostgrestError | Error | null;
+};
+
+export async function getMonthlySubscriptionPrice(): Promise<SupabaseResult<MonthlyPriceResult>> {
+  try {
+    const { data, error } = await supabaseServer
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'monthly_subscription_price')
+      .maybeSingle();
+
+    if (error) {
+      // Se a tabela não existir ou estiver vazia, retorna valor padrão sem erro
+      if (error.code === 'PGRST116' || error.code === '42P01') {
+        return { data: { price: DEFAULT_MONTHLY_PRICE }, error: null };
+      }
+      console.error('Error fetching monthly subscription price:', error);
+      return { data: null, error };
+    }
+
+    if (!data || !data.value) {
+      return { data: { price: DEFAULT_MONTHLY_PRICE }, error: null };
+    }
+
+    const parsedValue = parseFloat(data.value);
+    return {
+      data: { price: Number.isNaN(parsedValue) ? DEFAULT_MONTHLY_PRICE : parsedValue },
+      error: null,
+    };
+  } catch (err) {
+    console.error('Unexpected error fetching monthly subscription price:', err);
+    return { data: null, error: err as Error };
+  }
+}
+
+export async function updateMonthlySubscriptionPrice(price: number): Promise<SupabaseResult<Record<string, unknown>>> {
+  try {
+    const { data, error } = await supabaseServer
+      .from('app_settings')
+      .upsert(
+        {
+          key: 'monthly_subscription_price',
+          value: price.toString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'key',
+        }
+      )
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating monthly subscription price:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('Unexpected error updating monthly subscription price:', err);
+    return { data: null, error: err as Error };
+  }
 }
