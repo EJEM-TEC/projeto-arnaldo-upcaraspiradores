@@ -93,7 +93,7 @@ export default function DashboardLayout({ children, subtitle, title }: Dashboard
               width={sidebarOpen ? 200 : 48}
               height={sidebarOpen ? 90 : 48}
               className={`cursor-pointer hover:opacity-80 transition-all duration-300 ${sidebarOpen ? '' : 'object-contain'}`}
-              onClick={() => router.push('/')}
+              onClick={() => router.push('/painel_de_controle')}
               priority
             />
           </div>

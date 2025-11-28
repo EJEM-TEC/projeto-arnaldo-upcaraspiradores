@@ -40,7 +40,6 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
         cpf?: string;
         cardData?: CardData;
         pixCode?: string;
-        qrCode?: string;
     } | null>(null);
     const router = useRouter();
 
@@ -166,7 +165,7 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
         }
     };
 
-    const handlePixNext = (data: { amount: string; cpf: string; pixCode?: string; qrCode?: string }) => {
+    const handlePixNext = (data: { amount: string; cpf: string; pixCode?: string }) => {
         setPaymentData(data);
         setCurrentView('pix-code');
     };
@@ -256,7 +255,6 @@ export default function MobileDashboard({ machineSlug }: MobileDashboardProps) {
                     amount={paymentData?.amount || '0'}
                     cpf={paymentData?.cpf || ''}
                     pixCode={paymentData?.pixCode}
-                    qrCode={paymentData?.qrCode}
                     onCopyCode={handlePixCopyCode}
                 />;
             case 'timer':

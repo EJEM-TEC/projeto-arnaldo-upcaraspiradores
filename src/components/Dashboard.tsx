@@ -1247,7 +1247,7 @@ export default function Dashboard() {
         return (
           <>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">Faturamento e Repasse</h2>
+              <h2 className="text-3xl font-bold text-gray-900">Faturamento</h2>
               <select
                 value={billingPeriod}
                 onChange={(e) => setBillingPeriod(e.target.value as 'today' | 'week' | 'month' | 'year')}

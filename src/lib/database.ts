@@ -492,6 +492,30 @@ export async function updateActivationHistory(
   return { data, error: null };
 }
 
+// Update activation history with user info
+export async function updateActivationHistoryWithUser(
+  historyId: number, 
+  userId: string, 
+  cost: number
+) {
+  const { data, error } = await supabase
+    .from('activation_history')
+    .update({
+      user_id: userId,
+      cost: cost,
+    })
+    .eq('id', historyId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating activation history with user:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
+
 // Transaction/Cash History functions
 export interface Transaction {
   id: number;
