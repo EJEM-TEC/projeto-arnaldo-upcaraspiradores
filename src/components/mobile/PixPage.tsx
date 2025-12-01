@@ -83,7 +83,7 @@ export default function PixPage({ onNext }: PixPageProps) {
                         <button
                             key={amount}
                             onClick={() => setSelectedAmount(amount)}
-                            className={`w-full h-16 rounded-full font-bold text-lg transition-colors ${selectedAmount === amount
+                            className={`w-full h-16 rounded-md font-bold text-lg transition-colors ${selectedAmount === amount
                                     ? 'bg-orange-500 text-white'
                                     : 'bg-white text-black hover:bg-gray-200'
                                 }`}

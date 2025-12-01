@@ -226,7 +226,7 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                                 setError(''); // Limpa erro ao mudar valor
                             }}
                             disabled={loading}
-                            className={`w-20 h-20 rounded-full font-bold text-lg transition-colors flex items-center justify-center ${selectedAmount === amount
+                            className={`w-20 h-20 rounded-md font-bold text-lg transition-colors flex items-center justify-center ${selectedAmount === amount
                                 ? 'bg-orange-500 text-white'
                                 : 'bg-white text-black hover:bg-gray-200'
                                 } disabled:opacity-50`}
@@ -285,7 +285,7 @@ export default function CreditCardPage({ onNext }: CreditCardPageProps) {
                 type="button"
                 onClick={handleCheckoutPro}
                 disabled={loading}
-                className={`w-full h-14 rounded-full font-bold text-lg transition-colors mt-6 ${loading
+                className={`w-full h-14 rounded-md font-bold text-lg transition-colors mt-6 ${loading
                     ? 'bg-gray-500 text-white cursor-not-allowed'
                     : 'bg-orange-500 text-white hover:bg-orange-600'
                     } disabled:opacity-50`}

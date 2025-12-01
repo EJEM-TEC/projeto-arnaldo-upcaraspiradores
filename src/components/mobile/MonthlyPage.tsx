@@ -292,7 +292,7 @@ export default function MonthlyPage({ onNext }: MonthlyPageProps) {
                 type="button"
                 onClick={handleCheckoutPro}
                 disabled={loading || loadingPrice}
-                className={`w-full h-14 rounded-full font-bold text-lg transition-colors mt-6 ${loading || loadingPrice
+                className={`w-full h-14 rounded-md font-bold text-lg transition-colors mt-6 ${loading || loadingPrice
                     ? 'bg-gray-500 text-white cursor-not-allowed'
                     : 'bg-orange-500 text-white hover:bg-orange-600'
                     } disabled:opacity-50`}
